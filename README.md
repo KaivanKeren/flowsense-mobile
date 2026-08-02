@@ -1,17 +1,32 @@
 # flowsense_mobile
 
-A new Flutter project.
+Two FlowSense mobile frontends — `warga` (citizen traffic map) and `operator`
+(intersection dashboard) — as one Flutter codebase with two flavors.
 
-## Getting Started
+> Scratch notes. Task 12 replaces this with the real README.
 
-This project is a starting point for a Flutter application.
+## Running
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter run --dart-define=FLOWSENSE_API_BASE=https://... --dart-define=FLOWSENSE_API_KEY=...
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Without those defines `AppConfig.isConfigured` is false and the app degrades to
+`FakeFlowSenseApi` backed by `test/fixtures/` — the demo never dies on a missing
+key.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Optional: `FLOWSENSE_POLL_SECONDS` (5), `FLOWSENSE_STALE_SECONDS` (30),
+`FLOWSENSE_LANE_CAPACITY` (12).
+
+**Never `git add` a launch config containing a real key.**
+
+## Docs
+
+- [`docs/api-contract.md`](docs/api-contract.md) — the backend contract.
+
+## Tests
+
+```bash
+flutter test
+dart analyze
+```
