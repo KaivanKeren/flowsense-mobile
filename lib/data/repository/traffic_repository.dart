@@ -150,12 +150,14 @@ class TrafficRepository {
     _controller.add(state);
   }
 
+  /// Stops polling and closes the stream. The [api] is deliberately **not**
+  /// closed here — it is injected, outlives this object in the provider graph,
+  /// and is shared with `intersectionsProvider`. Whoever built it closes it.
   void dispose() {
     if (_disposed) return;
     _disposed = true;
     unawaited(_ticks?.cancel());
     _ticks = null;
     unawaited(_controller.close());
-    api.close();
   }
 }
