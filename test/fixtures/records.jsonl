@@ -1,0 +1,9 @@
+{"ts":1755000000,"camera_id":30,"camera":"Simpang DPRD Arah Kota","total_vehicles":4,"per_lane":{"kota":2,"ploso":2}}
+{"ts":1755000002,"camera_id":30,"camera":"Simpang DPRD Arah Kota","total_vehicles":9,"per_lane":{"kota":6,"ploso":3},"crossings":{"kota":12,"ploso":7}}
+{"ts":1755000004,"camera_id":30,"camera":"Simpang DPRD Arah Kota","total_vehicles":13,"per_lane":{"kota":11,"ploso":2},"crossings":{"kota":18,"ploso":9}}
+{"ts":1755000000,"camera_id":31,"camera":"Simpang Tanjung","total_vehicles":3,"per_lane":{"utara":1,"selatan":2}}
+{"ts":1755000002,"camera_id":31,"camera":"Simpang Tanjung","total_vehicles":6,"per_lane":{"utara":4,"selatan":2}}
+{"ts":1755000004,"camera_id":31,"camera":"Simpang Tanjung","total_vehicles":5,"per_lane":{"utara":2,"selatan":3}}
+{"ts":1755000000,"camera_id":32,"camera":"Simpang Jember Arah Terminal","total_vehicles":8,"per_lane":{"terminal":5,"pasar":3},"crossings":{"terminal":21,"pasar":14}}
+{"ts":1755000002,"camera_id":32,"camera":"Simpang Jember Arah Terminal","total_vehicles":12,"per_lane":{"terminal":9,"pasar":3},"crossings":{"terminal":27,"pasar":15}}
+{"ts":1755000004,"camera_id":32,"camera":"Simpang Jember Arah Terminal","total_vehicles":10,"per_lane":{"terminal":6,"pasar":4},"crossings":{"terminal":33,"pasar":18}}

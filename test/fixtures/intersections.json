@@ -1,0 +1,26 @@
+[
+  {
+    "id": "30",
+    "name": "Simpang DPRD",
+    "lat": -6.8047,
+    "lon": 110.8405,
+    "lanes": ["kota", "ploso"],
+    "capacity": {"kota": 14, "ploso": 10}
+  },
+  {
+    "id": "31",
+    "name": "Simpang Tanjung",
+    "lat": -6.8112,
+    "lon": 110.8348,
+    "lanes": ["utara", "selatan"],
+    "capacity": {"utara": 12, "selatan": 12}
+  },
+  {
+    "id": "32",
+    "name": "Simpang Jember",
+    "lat": -6.7983,
+    "lon": 110.8461,
+    "lanes": ["terminal", "pasar"],
+    "capacity": {"terminal": 16, "pasar": 9}
+  }
+]
