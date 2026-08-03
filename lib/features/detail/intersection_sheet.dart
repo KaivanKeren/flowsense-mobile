@@ -91,13 +91,8 @@ class IntersectionSheet extends StatelessWidget {
     TrafficRecord reading,
     CongestionColors colors,
   ) {
-    final ordered = <String>[
-      ...intersection.lanes.where(reading.perLane.containsKey),
-      ...reading.perLane.keys.where((k) => !intersection.lanes.contains(k)),
-    ];
-
     return [
-      for (final lane in ordered)
+      for (final lane in intersection.orderedLanes(reading.perLane.keys))
         _LaneRow(
           lane: lane,
           count: reading.perLane[lane]!,

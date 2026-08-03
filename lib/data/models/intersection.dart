@@ -41,6 +41,20 @@ class Intersection {
   int capacityFor(String lane, {required int fallback}) =>
       capacity[lane] ?? fallback;
 
+  /// The lanes in [present], ordered by this intersection's declared [lanes],
+  /// with anything that appeared mid-session appended rather than dropped.
+  ///
+  /// Every lane breakdown in the app renders through this, so a marker ring, a
+  /// detail sheet, and the operator bars all agree — and none of them reshuffle
+  /// between polls just because a map's iteration order changed.
+  List<String> orderedLanes(Iterable<String> present) {
+    final actual = present.toList();
+    return [
+      ...lanes.where(actual.contains),
+      ...actual.where((lane) => !lanes.contains(lane)),
+    ];
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

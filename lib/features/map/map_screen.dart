@@ -12,6 +12,7 @@ import '../../data/models/traffic_snapshot.dart';
 import '../../data/repository/traffic_repository.dart';
 import '../../domain/congestion.dart';
 import '../../state/providers.dart';
+import '../common/feed_view.dart';
 import '../common/stale_banner.dart';
 import '../detail/intersection_sheet.dart';
 import 'intersection_marker.dart';
@@ -26,7 +27,10 @@ class MapScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-        appBar: AppBar(title: const Text('Lalu lintas')),
+        appBar: AppBar(
+          title: const Text('Lalu lintas'),
+          actions: [if (ref.watch(isDemoProvider)) const DemoBadge()],
+        ),
         body: MaxWidth448(child: _content(context, ref)),
       );
 
@@ -44,21 +48,10 @@ class MapScreen extends ConsumerWidget {
 
     // A failed poll still renders its last good snapshot — under a banner
     // saying what happened — rather than blanking the screen.
-    final (TrafficSnapshot? snapshot, String? banner) = switch (state) {
-      RepoLoading() => (null, null),
-      RepoData(:final snapshot, :final isStale, :final isFromCache) => (
-          snapshot,
-          isFromCache
-              ? 'Data tersimpan. ${_lastDataText(snapshot, now)}'
-              : isStale
-                  ? _lastDataText(snapshot, now)
-                  : null,
-        ),
-      RepoError(:final message, :final lastGood) => (lastGood, message),
-    };
+    final FeedView(:snapshot, :banner) = FeedView.of(state, now);
 
     if (snapshot == null) {
-      return _EmptyOrError(
+      return QuietState(
         title: 'Data tidak dapat dimuat',
         body: banner ?? 'Coba lagi sebentar.',
         actionLabel: 'Coba lagi',
@@ -67,7 +60,7 @@ class MapScreen extends ConsumerWidget {
     }
 
     if (snapshot.isEmpty) {
-      return _EmptyOrError(
+      return QuietState(
         title: 'Belum ada data lalu lintas',
         body: 'Pastikan konektor kamera sedang berjalan, lalu muat ulang.',
         actionLabel: 'Muat ulang',
@@ -108,14 +101,6 @@ class MapScreen extends ConsumerWidget {
     );
   }
 
-  static String _lastDataText(TrafficSnapshot snapshot, DateTime now) {
-    final newest = snapshot.records.isEmpty
-        ? snapshot.fetchedAt
-        : snapshot.records
-            .map((r) => r.ts)
-            .reduce((a, b) => a.isAfter(b) ? a : b);
-    return 'Data terakhir ${relativeIndonesian(now.difference(newest))}';
-  }
 }
 
 typedef OnSelectIntersection = void Function(
@@ -200,46 +185,5 @@ class _MapView extends StatelessWidget {
     final lon = intersections.map((i) => i.lon).reduce((a, b) => a + b) /
         intersections.length;
     return LatLng(lat, lon);
-  }
-}
-
-/// Both quiet states share a shape: what is going on, and what to do about it.
-class _EmptyOrError extends StatelessWidget {
-  const _EmptyOrError({
-    required this.title,
-    required this.body,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final String title;
-  final String body;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: text.titleMedium, textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text(
-              body,
-              style: text.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            FilledButton(onPressed: onAction, child: Text(actionLabel)),
-          ],
-        ),
-      ),
-    );
   }
 }

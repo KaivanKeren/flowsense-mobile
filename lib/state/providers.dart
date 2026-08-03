@@ -13,6 +13,12 @@ final appConfigProvider = Provider<AppConfig>(
   (ref) => const AppConfig.fromEnvironment(),
 );
 
+/// True when the app is running on bundled fixtures because no backend was
+/// configured. Derived from the same condition `buildApi` uses, so the badge in
+/// the app bar cannot disagree with what is actually serving the data.
+final isDemoProvider =
+    Provider<bool>((ref) => !ref.watch(appConfigProvider).isConfigured);
+
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
 
 final snapshotCacheProvider =
@@ -52,9 +58,21 @@ final intersectionsProvider = FutureProvider<List<Intersection>>(
 /// Camera id of the intersection whose detail sheet is open, or null.
 final selectedIntersectionProvider = StateProvider<String?>((ref) => null);
 
+/// How far back the operator history chart looks.
+const kHistoryWindow = Duration(hours: 1);
+
 /// History for one intersection, backed by `FlowSenseApi.history`. Keyed by
 /// camera id so the operator dashboard can chart whichever one is selected.
-final historyProvider =
-    FutureProvider.family<List<TrafficRecord>, String>(
-  (ref, cameraId) => ref.watch(apiProvider).history(cameraId),
+///
+/// The window is requested explicitly rather than left to the server's default:
+/// the chart's x-axis is drawn against [kHistoryWindow], so the two must agree.
+final historyProvider = FutureProvider.family<List<TrafficRecord>, String>(
+  (ref, cameraId) {
+    final now = ref.watch(clockProvider).now();
+    return ref.watch(apiProvider).history(
+          cameraId,
+          from: now.subtract(kHistoryWindow),
+          to: now,
+        );
+  },
 );

@@ -90,13 +90,8 @@ class IntersectionMarker extends StatelessWidget {
     final perLane = record?.perLane ?? const <String, int>{};
     if (perLane.isEmpty) return const [];
 
-    final ordered = <String>[
-      ...intersection.lanes.where(perLane.containsKey),
-      ...perLane.keys.where((k) => !intersection.lanes.contains(k)),
-    ];
-
     return [
-      for (final lane in ordered)
+      for (final lane in intersection.orderedLanes(perLane.keys))
         _LaneSlice(
           weight: perLane[lane]!.toDouble(),
           color: colorFor(
