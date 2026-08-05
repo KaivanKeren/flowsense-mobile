@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/clock.dart';
 import '../core/config/app_config.dart';
 import '../data/api/flowsense_api.dart';
 import '../data/cache/snapshot_cache.dart';
+import '../data/location/location_source.dart';
 import '../data/models/intersection.dart';
 import '../data/models/traffic_record.dart';
+import '../data/prefs/subscription_store.dart';
 import '../data/repository/traffic_repository.dart';
+import '../domain/subscription.dart';
 
 /// Runtime config. Overridden in tests; read from `--dart-define` in the app.
 final appConfigProvider = Provider<AppConfig>(
@@ -76,3 +81,55 @@ final historyProvider = FutureProvider.family<List<TrafficRecord>, String>(
         );
   },
 );
+
+/// Overridden with a fake in tests, so no widget test touches a platform
+/// channel.
+final locationSourceProvider =
+    Provider<LocationSource>((ref) => const GeolocatorLocationSource());
+
+/// The device's position, or null when permission was refused, the service is
+/// off, or no fix arrived.
+///
+/// Read once rather than streamed: the list shows distance to fixed junctions,
+/// which does not need to update as a rider moves — and a live position stream
+/// would cost battery for a number rendered to one decimal place.
+final deviceLocationProvider = FutureProvider<DeviceLocation?>(
+  (ref) => ref.watch(locationSourceProvider).current(),
+);
+
+final subscriptionStoreProvider =
+    Provider<SubscriptionStore>((ref) => const SubscriptionStore());
+
+/// What the user asked to be notified about. Device-local; never sent anywhere.
+final subscriptionProvider =
+    NotifierProvider<SubscriptionNotifier, SubscriptionSettings>(
+  SubscriptionNotifier.new,
+);
+
+class SubscriptionNotifier extends Notifier<SubscriptionSettings> {
+  @override
+  SubscriptionSettings build() {
+    // Defaults render immediately and the stored value replaces them when it
+    // arrives, so the settings screen never opens on a spinner.
+    unawaited(_restore());
+    return const SubscriptionSettings();
+  }
+
+  Future<void> _restore() async {
+    final stored = await ref.read(subscriptionStoreProvider).load();
+    state = stored;
+  }
+
+  Future<void> _persist(SubscriptionSettings next) async {
+    state = next;
+    await ref.read(subscriptionStoreProvider).save(next);
+  }
+
+  Future<void> toggle(String cameraId) => _persist(state.toggle(cameraId));
+
+  Future<void> setThreshold(AlertThreshold threshold) =>
+      _persist(state.copyWith(threshold: threshold));
+
+  Future<void> setActiveHours(List<TimeRange> hours) =>
+      _persist(state.copyWith(activeHours: hours));
+}

@@ -156,12 +156,32 @@ void main() {
 
     expect(find.byType(IntersectionSheet), findsOneWidget);
     expect(find.text('Simpang DPRD'), findsOneWidget);
-    expect(find.text('kota'), findsOneWidget);
-    expect(find.text('4/10'), findsOneWidget);
-    expect(find.text('ploso'), findsOneWidget);
-    expect(find.text('2/10'), findsOneWidget);
-    // The other intersection's lanes are not in this sheet.
-    expect(find.text('utara'), findsNothing);
+
+    // The compact stage answers the only question a rider has, with no
+    // further gesture: how bad, how old, and which approach.
+    expect(find.text('6 kendaraan · baru saja'), findsOneWidget);
+    expect(find.text('Arah kota paling padat'), findsOneWidget);
+
+    // The lane breakdown belongs to this camera, not its neighbour.
+    expect(find.byKey(const ValueKey('lane-kota')), findsOneWidget);
+    expect(find.byKey(const ValueKey('lane-ploso')), findsOneWidget);
+    expect(find.byKey(const ValueKey('lane-utara')), findsNothing);
+  });
+
+  testWidgets('the sheet opens at the compact snap size', (tester) async {
+    await _pumpMap(
+      tester,
+      api: _ScriptedApi(TrafficSnapshot(fetchedAt: _t0, records: [
+        _record('30', {'kota': 4, 'ploso': 2}),
+      ])),
+    );
+
+    await tester.tap(find.bySemanticsLabel(RegExp('Simpang DPRD')));
+    await tester.pumpAndSettle();
+
+    final sheetHeight = tester.getSize(find.byType(IntersectionSheet)).height;
+    final screenHeight = tester.getSize(find.byType(MapScreen)).height;
+    expect(sheetHeight / screenHeight, closeTo(0.28, 0.02));
   });
 
   testWidgets('a stale snapshot shows the banner and greys the markers',
@@ -242,10 +262,14 @@ void main() {
       api: _ScriptedApi(TrafficSnapshot.empty(_t0)),
     );
 
-    expect(find.text('Belum ada data lalu lintas'), findsOneWidget);
+    expect(
+      find.text('Belum ada data masuk dari simpang mana pun.'),
+      findsOneWidget,
+    );
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.byType(IntersectionMarker), findsNothing);
-    expect(find.text('Muat ulang'), findsOneWidget);
+    // One sentence, one pressable button. Never an endless spinner.
+    expect(find.text('Coba lagi'), findsOneWidget);
   });
 
   testWidgets('OSM attribution is present — a licence obligation',
@@ -274,7 +298,30 @@ void main() {
       ])),
     );
 
-    expect(tester.getSize(find.byType(FlutterMap)).width,
-        lessThanOrEqualTo(448));
+    // A range, not a ceiling. `lessThanOrEqualTo(448)` is also satisfied by
+    // zero, which is exactly how a collapsed Stack once passed this test while
+    // the map was invisible on a real device.
+    final size = tester.getSize(find.byType(FlutterMap));
+    expect(size.width, inInclusiveRange(1, 448));
+    expect(size.height, greaterThan(0));
+  });
+
+  testWidgets('the map fills the screen behind the sheet', (tester) async {
+    // The bug this pins: every child of the screen's Stack is Positioned, and
+    // MaxWidth448 hands it loose constraints — so without StackFit.expand the
+    // whole body renders at 0x0 and only the tab bar is visible.
+    await _pumpMap(
+      tester,
+      api: _ScriptedApi(TrafficSnapshot(fetchedAt: _t0, records: [
+        _record('30', {'kota': 1, 'ploso': 1}),
+      ])),
+    );
+
+    final map = tester.getSize(find.byType(FlutterMap));
+    final screen = tester.getSize(find.byType(MapScreen));
+
+    expect(map.height, greaterThan(screen.height * 0.5),
+        reason: 'the map is the canvas, not a strip');
+    expect(map.width, greaterThan(0));
   });
 }

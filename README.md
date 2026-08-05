@@ -8,8 +8,8 @@ codebase with two flavors.
 > `data/connector_<camera_id>.jsonl` on local disk; the HTTP service described
 > in [`docs/api-contract.md`](docs/api-contract.md) still has to be built. Until
 > then the app runs on `FakeFlowSenseApi` backed by real connector output in
-> `test/fixtures/`, and says so in the app bar. Everything here builds, runs,
-> and tests without it.
+> `test/fixtures/`, and says so on screen. Everything here builds, runs, and
+> tests without it.
 
 ## Setup
 
@@ -61,8 +61,12 @@ hardcoded and no key is committed.
 
 Without a base URL **and** a key, `AppConfig.isConfigured` is false and
 `buildApi` degrades to `FakeFlowSenseApi` on the bundled fixtures. A demo never
-dies on a missing define — and the app bar carries a `Data contoh` badge, so
-canned numbers are never passed off as live traffic.
+dies on a missing define — and a `Data contoh` badge rides on every screen that
+shows fixture numbers, so canned data is never passed off as live traffic.
+
+`test/fixtures/demo.json` is staging rather than contract: it marks the camera
+served deliberately stale and the minutes missing from history, so the
+`Data basi` and `Data hilang` paths are reachable without unplugging anything.
 
 > **Never `git add` a launch config containing a real key.**
 
@@ -98,16 +102,66 @@ coordinating a release:
 
 See [`docs/api-contract.md`](docs/api-contract.md) for the four endpoints.
 
+## The citizen app
+
+Laid out to [`flowsense-warga-layout.md`](flowsense-warga-layout.md). Four
+routes behind a three-tab bar:
+
+| Route | Screen | What it is for |
+|---|---|---|
+| `/` | Peta | The map as a full canvas: a search field and a three-stage detail sheet float over it |
+| `/simpang` | Simpang | The same data as a list — worst-first, or nearest-first when location is allowed |
+| `/langganan` | Langganan | Which intersections to be notified about, at what level, during which hours |
+| `/tentang` | Tentang | Where the data comes from and how far to trust it. Reached from Langganan, not the tab bar |
+
+There is **no `Laporan` tab and no `Profil` tab**. Citizen reports need
+moderation they would not get, and there is no account to have a profile for —
+which also deletes an entire authentication layer from the backend.
+
+The detail sheet snaps at `0.28 / 0.55 / 0.92`. The compact stage answers the
+only question a rider actually has; lanes and the 60-minute history come next;
+the camera panel is **last**, on purpose — it is the most eye-catching element
+and the least actionable, since nobody reads congestion off low-resolution
+video faster than off one coloured bar.
+
+### Two encodings in the history chart
+
+Bar **height is the vehicle count; bar colour is the worst lane's level.** Two
+different sources, deliberately: taking the colour from the total would paint
+the chart green while one approach was completely blocked. Minutes with no data
+are drawn as a 3 px stub at the baseline and are **never interpolated across** —
+a smooth line through a connector outage is a lie, and it is the first thing an
+examiner asks about if the demo drops out.
+
+### Subscriptions and quiet hours
+
+Stored on the device with `shared_preferences` and sent nowhere. A list of the
+junctions somebody checks every morning describes their commute, and the app
+has no reason to know it. Active hours default to 06.00–09.00 and 15.00–19.00;
+outside them nothing is delivered. A `clear` is the one exception — it only
+takes a notification down, and suppressing it would strand a jam warning on
+screen after the jam ended.
+
+### Location
+
+`geolocator`, behind a `LocationSource` interface so no test touches a platform
+channel. Coarse permission only: the list renders distance to one decimal
+place, and street-level precision would buy nothing. **Refusal is a supported
+answer** — the nearest-first option hides itself and the list keeps working.
+
 ## How it is put together
 
 ```
 lib/
   core/       config, injected Clock, structured logging, 448 px layout cap
-  data/       models, API interface + HTTP and fake impls, polling repository, cache
-  domain/     congestion rules, jam alert rule — no package:flutter imports
-  features/   UI: map, detail sheet, operator dashboard, alerts
+  data/       models, API interface + HTTP and fake impls, repository, cache,
+              device-local prefs, LocationSource
+  domain/     congestion, jam alerts, history bucketing, subscriptions, geo —
+              no package:flutter imports
+  features/   UI: shell, map, detail sheet, simpang, langganan, tentang,
+              operator dashboard, alerts
   state/      Riverpod providers
-  app/        theme, flavor, entry-point wiring
+  app/        theme (every colour in the app), flavor, entry-point wiring
 ```
 
 Three constraints hold the design together:
@@ -135,7 +189,7 @@ Dart in `lib/domain/alerts.dart`, unit-tested against a `FakeClock`.
 ## Tests
 
 ```bash
-flutter test     # 115 tests: no network, no real clock, no platform channels
+flutter test     # 250 tests: no network, no real clock, no platform channels
 dart analyze     # must be clean; the build fails on warnings
 ```
 

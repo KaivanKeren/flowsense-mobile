@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Coarse only, and deliberately. The list sorts junctions by distance and
+         renders that distance to one decimal place; street-level precision
+         would buy nothing and ask for more than the feature needs. Refusal is
+         a supported answer: the nearest-first option hides itself and the list
+         keeps working. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:label="flowsense_mobile"
         android:name="${applicationName}"

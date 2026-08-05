@@ -6,11 +6,19 @@ import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
 import 'package:flowsense_mobile/data/repository/traffic_repository.dart';
 import 'package:flowsense_mobile/domain/alerts.dart';
 import 'package:flowsense_mobile/domain/congestion.dart';
+import 'package:flowsense_mobile/domain/subscription.dart';
 import 'package:flowsense_mobile/features/alerts/notifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final _t0 = DateTime.utc(2026, 8, 2, 12);
 const _poll = Duration(seconds: 5);
+
+/// Everything subscribed, every hour active — so the debounce tests measure the
+/// rule rather than the delivery gate.
+const _allowAll = SubscriptionSettings(
+  cameraIds: {'30', '31'},
+  activeHours: [TimeRange(startMinute: 0, endMinute: 24 * 60 - 1)],
+);
 
 AlertObservation _obs(
   CongestionLevel level, {
@@ -310,6 +318,10 @@ void main() {
       service = JamAlertService(
         notifier: notifier,
         config: const AppConfig(laneCapacityDefault: 10),
+        // These tests are about the debounce rule, so delivery is opened all
+        // the way up: both cameras subscribed, every hour active. The gating
+        // itself is exercised separately below.
+        subscriptions: _allowAll,
         clock: clock,
       );
     });
@@ -384,6 +396,111 @@ void main() {
       await service.onState(const RepoLoading(), _intersections);
       expect(notifier.raised, isEmpty);
       expect(notifier.cleared, isEmpty);
+    });
+  });
+
+  group('delivery gate', () {
+    late FakeAlertNotifier notifier;
+    late FakeClock clock;
+
+    JamAlertService serviceWith(SubscriptionSettings subscriptions) =>
+        JamAlertService(
+          notifier: notifier,
+          config: const AppConfig(laneCapacityDefault: 10),
+          subscriptions: subscriptions,
+          clock: clock,
+        );
+
+    setUp(() {
+      notifier = FakeAlertNotifier();
+      clock = FakeClock(_t0);
+    });
+
+    Future<void> jam(JamAlertService service, {int polls = 4}) async {
+      for (var i = 0; i < polls; i++) {
+        clock.advance(_poll);
+        await service.onState(
+          _fresh(clock.now(), kota: 9, utara: 1),
+          _intersections,
+        );
+      }
+    }
+
+    test('nothing is delivered when nothing is subscribed', () async {
+      // The default. The app never opts anyone in on their behalf.
+      await jam(serviceWith(const SubscriptionSettings()));
+      expect(notifier.raised, isEmpty);
+    });
+
+    test('an unsubscribed intersection stays silent while a jam runs',
+        () async {
+      await jam(serviceWith(SubscriptionSettings(
+        cameraIds: const {'31'}, // not the one that jams
+        activeHours: _allowAll.activeHours,
+      )));
+      expect(notifier.raised, isEmpty);
+    });
+
+    test('outside the active hours, a real jam is not delivered', () async {
+      // _t0 is 12:00 — squarely between the two commute windows.
+      await jam(serviceWith(const SubscriptionSettings(
+        cameraIds: {'30'},
+        activeHours: SubscriptionSettings.defaultActiveHours,
+      )));
+      expect(notifier.raised, isEmpty,
+          reason: 'the default quiet hours must actually be quiet');
+    });
+
+    test('inside an active window the same jam is delivered', () async {
+      // Same settings, a clock inside the morning peak.
+      clock = FakeClock(DateTime.utc(2026, 8, 2, 7));
+      await jam(serviceWith(const SubscriptionSettings(
+        cameraIds: {'30'},
+        activeHours: SubscriptionSettings.defaultActiveHours,
+      )));
+      expect(notifier.raised, hasLength(1));
+    });
+
+    test('the macet-only threshold ignores a padat intersection', () async {
+      final service = serviceWith(SubscriptionSettings(
+        cameraIds: const {'30'},
+        activeHours: _allowAll.activeHours,
+      ));
+      for (var i = 0; i < 4; i++) {
+        clock.advance(_poll);
+        // 5/10 is padat, never macet, so the rule never raises anyway — the
+        // point is that it stays silent under both mechanisms.
+        await service.onState(
+          _fresh(clock.now(), kota: 5, utara: 1),
+          _intersections,
+        );
+      }
+      expect(notifier.raised, isEmpty);
+    });
+
+    test('a clear is delivered even after the window closes', () async {
+      // Raise inside the morning peak...
+      clock = FakeClock(DateTime.utc(2026, 8, 2, 8, 50));
+      final service = serviceWith(const SubscriptionSettings(
+        cameraIds: {'30'},
+        activeHours: SubscriptionSettings.defaultActiveHours,
+      ));
+      await jam(service, polls: 3);
+      expect(notifier.raised, hasLength(1));
+
+      // ...and recover after 09:00, when raises are no longer allowed.
+      clock.advance(const Duration(minutes: 20));
+      for (var i = 0; i < 3; i++) {
+        clock.advance(_poll);
+        await service.onState(
+          _fresh(clock.now(), kota: 1, utara: 1),
+          _intersections,
+        );
+      }
+
+      // Suppressing this would strand a jam warning on screen after the jam
+      // ended — worse than the notification it was trying to avoid.
+      expect(notifier.cleared, hasLength(1));
     });
   });
 }

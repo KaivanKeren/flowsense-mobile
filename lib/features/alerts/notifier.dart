@@ -10,6 +10,7 @@ import '../../core/logging/logger.dart';
 import '../../data/models/intersection.dart';
 import '../../data/repository/traffic_repository.dart';
 import '../../domain/alerts.dart';
+import '../../domain/subscription.dart';
 import '../../state/providers.dart';
 
 /// How an alert reaches the user.
@@ -111,12 +112,20 @@ class JamAlertService {
   JamAlertService({
     required this.notifier,
     required this.config,
+    this.subscriptions = const SubscriptionSettings(),
     this.clock = const SystemClock(),
     AlertEngine? engine,
   }) : engine = engine ?? AlertEngine();
 
   final AlertNotifier notifier;
   final AppConfig config;
+
+  /// What the user actually asked to hear about. Consulted at **delivery**
+  /// time, not before the rule runs: the debounce state has to keep tracking
+  /// every intersection regardless, or unsubscribing and resubscribing would
+  /// reset a jam's streak and fire late.
+  final SubscriptionSettings subscriptions;
+
   final Clock clock;
   final AlertEngine engine;
 
@@ -144,15 +153,32 @@ class JamAlertService {
     );
 
     for (final event in events) {
+      final observation = event.observation;
+
+      // A `clear` is always delivered. It only ever takes a notification down,
+      // and suppressing it — because the user just unsubscribed, or because
+      // the quiet hours started — would strand a jam warning on screen after
+      // the jam ended.
+      final allowed = event.decision == AlertDecision.clear ||
+          subscriptions.allows(
+            cameraId: observation.cameraId,
+            level: observation.level,
+            isStale: observation.isStale,
+            now: now,
+          );
+
       FlowLog.event('jam alert', fields: {
-        'camera_id': event.observation.cameraId,
+        'camera_id': observation.cameraId,
         'decision': event.decision.name,
+        'delivered': allowed,
       });
+      if (!allowed) continue;
+
       switch (event.decision) {
         case AlertDecision.raise:
-          await notifier.raise(event.observation);
+          await notifier.raise(observation);
         case AlertDecision.clear:
-          await notifier.clear(event.observation);
+          await notifier.clear(observation);
         case AlertDecision.none:
           break; // observe() never emits these.
       }
@@ -163,10 +189,15 @@ class JamAlertService {
 final alertNotifierProvider =
     Provider<AlertNotifier>((ref) => LocalAlertNotifier());
 
+/// Rebuilt when the settings change, but the [AlertEngine] it carries is
+/// created fresh with it — which is correct: editing subscriptions is a rare,
+/// deliberate act, and starting the debounce over is safer than carrying
+/// streaks across a change in what the user asked for.
 final jamAlertServiceProvider = Provider<JamAlertService>(
   (ref) => JamAlertService(
     notifier: ref.watch(alertNotifierProvider),
     config: ref.watch(appConfigProvider),
+    subscriptions: ref.watch(subscriptionProvider),
     clock: ref.watch(clockProvider),
   ),
 );
