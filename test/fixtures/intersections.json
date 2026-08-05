@@ -4,23 +4,89 @@
     "name": "Simpang DPRD",
     "lat": -6.8047,
     "lon": 110.8405,
-    "lanes": ["kota", "ploso"],
-    "capacity": {"kota": 14, "ploso": 10}
+    "lanes": [
+      "kota",
+      "ploso",
+      "demak",
+      "sekoe"
+    ],
+    "capacity": {
+      "kota": 12,
+      "ploso": 10,
+      "demak": 8,
+      "sekoe": 6
+    }
   },
   {
     "id": "31",
-    "name": "Simpang Tanjung",
-    "lat": -6.8112,
-    "lon": 110.8348,
-    "lanes": ["utara", "selatan"],
-    "capacity": {"utara": 12, "selatan": 12}
+    "name": "Simpang Tujuh",
+    "lat": -6.8089,
+    "lon": 110.8372,
+    "lanes": [
+      "barat",
+      "timur",
+      "utara",
+      "selatan"
+    ],
+    "capacity": {
+      "barat": 10,
+      "timur": 10,
+      "utara": 8,
+      "selatan": 8
+    }
   },
   {
     "id": "32",
-    "name": "Simpang Jember",
+    "name": "Simpang Jati",
     "lat": -6.7983,
     "lon": 110.8461,
-    "lanes": ["terminal", "pasar"],
-    "capacity": {"terminal": 16, "pasar": 9}
+    "lanes": [
+      "kudus",
+      "pati",
+      "pasar",
+      "terminal"
+    ],
+    "capacity": {
+      "kudus": 12,
+      "pati": 12,
+      "pasar": 10,
+      "terminal": 10
+    }
+  },
+  {
+    "id": "33",
+    "name": "Simpang Bae",
+    "lat": -6.7912,
+    "lon": 110.829,
+    "lanes": [
+      "barat",
+      "timur",
+      "kampus",
+      "pasar"
+    ],
+    "capacity": {
+      "barat": 12,
+      "timur": 12,
+      "kampus": 10,
+      "pasar": 10
+    }
+  },
+  {
+    "id": "34",
+    "name": "Simpang Ngembal",
+    "lat": -6.8175,
+    "lon": 110.8534,
+    "lanes": [
+      "utara",
+      "selatan",
+      "gebog",
+      "pasar"
+    ],
+    "capacity": {
+      "utara": 10,
+      "selatan": 10,
+      "gebog": 8,
+      "pasar": 8
+    }
   }
 ]

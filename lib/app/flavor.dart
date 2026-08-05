@@ -7,8 +7,8 @@ import '../data/api/fake_flowsense_api.dart';
 import '../data/api/flowsense_api.dart';
 import '../data/api/http_flowsense_api.dart';
 import '../features/alerts/notifier.dart';
-import '../features/map/map_screen.dart';
 import '../features/operator/dashboard_screen.dart';
+import '../features/shell/warga_shell.dart';
 import '../state/providers.dart';
 import 'theme.dart';
 
@@ -32,7 +32,7 @@ enum Flavor {
 /// another route, which is advice for someone on the road — an operator is
 /// already looking at the dashboard that would have raised it.
 Widget homeFor(Flavor flavor) => switch (flavor) {
-      Flavor.warga => const JamAlertListener(child: MapScreen()),
+      Flavor.warga => const JamAlertListener(child: WargaShell()),
       Flavor.operator => const DashboardScreen(),
     };
 
@@ -86,7 +86,14 @@ class FlowSenseApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: flavor.appTitle,
         theme: flowSenseTheme(),
-        darkTheme: flowSenseTheme(brightness: Brightness.dark),
+        // Warga is light-only, by decision rather than omission: the layout
+        // spec files dark mode under "deliberately not built" — it scores
+        // nothing and doubles the contrast checking. Operator has no such
+        // spec and keeps following the system.
+        darkTheme: flavor == Flavor.warga
+            ? null
+            : flowSenseTheme(brightness: Brightness.dark),
+        themeMode: flavor == Flavor.warga ? ThemeMode.light : ThemeMode.system,
         home: homeFor(flavor),
       );
 }

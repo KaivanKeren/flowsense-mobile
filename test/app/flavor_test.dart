@@ -9,7 +9,9 @@ import 'package:flowsense_mobile/features/alerts/notifier.dart';
 import 'package:flowsense_mobile/features/common/feed_view.dart';
 import 'package:flowsense_mobile/features/map/map_screen.dart';
 import 'package:flowsense_mobile/features/operator/dashboard_screen.dart';
+import 'package:flowsense_mobile/features/shell/warga_shell.dart';
 import 'package:flowsense_mobile/state/providers.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -67,12 +69,32 @@ void main() {
     expect((await api.snapshot()).records, isNotEmpty);
   });
 
-  testWidgets('the warga flavor lands on the map', (tester) async {
+  testWidgets('the warga flavor lands on the map, inside the shell',
+      (tester) async {
     await _pumpApp(tester, Flavor.warga);
 
+    expect(find.byType(WargaShell), findsOneWidget);
     expect(find.byType(MapScreen), findsOneWidget);
     expect(find.byType(DashboardScreen), findsNothing);
-    expect(find.text('Lalu lintas'), findsOneWidget);
+  });
+
+  testWidgets('the warga shell carries exactly three tabs', (tester) async {
+    await _pumpApp(tester, Flavor.warga);
+
+    // Three, and only three. `Laporan` and `Profil` are refused on purpose.
+    expect(find.text('peta'), findsOneWidget);
+    expect(find.text('simpang'), findsOneWidget);
+    expect(find.text('langganan'), findsOneWidget);
+    expect(find.text('laporan'), findsNothing);
+    expect(find.text('profil'), findsNothing);
+  });
+
+  testWidgets('warga is light-only, by decision', (tester) async {
+    await _pumpApp(tester, Flavor.warga);
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.darkTheme, isNull);
+    expect(app.themeMode, ThemeMode.light);
   });
 
   testWidgets('the operator flavor lands on the dashboard', (tester) async {

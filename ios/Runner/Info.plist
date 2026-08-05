@@ -16,6 +16,12 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>flowsense_mobile</string>
+	<!-- Shown verbatim in the iOS permission prompt. It says what the location
+	     is for and what happens if you say no, because "Allow FlowSense to use
+	     your location?" with no reason attached is how people learn to refuse
+	     every prompt. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Dipakai untuk mengurutkan simpang dari yang terdekat. Tanpa izin ini, daftar simpang tetap bisa dilihat.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

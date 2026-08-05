@@ -46,7 +46,7 @@ void main() {
 
     final state = container.read(snapshotProvider);
     expect(state, isA<AsyncData<RepoState>>());
-    expect((state.value! as RepoData).snapshot.records, hasLength(3));
+    expect((state.value! as RepoData).snapshot.records, hasLength(5));
   });
 
   test('the repository behind the provider still opens with RepoLoading',
@@ -80,13 +80,15 @@ void main() {
     final container = _container(_api());
     final list = await container.read(intersectionsProvider.future);
 
-    expect(list.map((i) => i.id), ['30', '31', '32']);
+    expect(list.map((i) => i.id), ['30', '31', '32', '33', '34']);
   });
 
   test('historyProvider is keyed per camera', () async {
     final container = _container(_api());
 
-    expect(await container.read(historyProvider('30').future), hasLength(3));
+    // A full hour, one bucket a minute. No demo staging is loaded here, so
+    // there are no gap minutes to subtract.
+    expect(await container.read(historyProvider('30').future), hasLength(60));
     expect(await container.read(historyProvider('nope').future), isEmpty);
   });
 

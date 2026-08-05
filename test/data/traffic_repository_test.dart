@@ -48,7 +48,7 @@ void main() {
     expect(states, hasLength(2));
     expect(states.first, isA<RepoLoading>());
     final data = states.last as RepoData;
-    expect(data.snapshot.records, hasLength(3));
+    expect(data.snapshot.records, hasLength(5));
     expect(data.isStale, isFalse);
     expect(data.isFromCache, isFalse);
 
@@ -74,7 +74,7 @@ void main() {
     expect(error.message, isNotEmpty);
     expect(error.lastGood, isNotNull,
         reason: 'a transient failure must not blank the screen');
-    expect(error.lastGood!.records, hasLength(3));
+    expect(error.lastGood!.records, hasLength(5));
 
     repo.dispose();
   });
@@ -99,7 +99,7 @@ void main() {
 
     final data = states.last as RepoData;
     expect(data.isFromCache, isFalse);
-    expect(data.snapshot.records, hasLength(3));
+    expect(data.snapshot.records, hasLength(5));
 
     repo.dispose();
   });
@@ -186,7 +186,7 @@ void main() {
 
     final persisted = await cache.read();
     expect(persisted, isNotNull);
-    expect(persisted!.records, hasLength(3));
+    expect(persisted!.records, hasLength(5));
 
     repo.dispose();
   });

@@ -1,0 +1,12 @@
+{
+  "_comment": "Demo-only staging for FakeFlowSenseApi. Not part of the API contract and never served by a real backend \u2014 it exists so the stale and missing-data paths are reachable with no backend at all.",
+  "stalledCameras": [
+    "34"
+  ],
+  "stalledBySeconds": 240,
+  "historyGapAgoMinutes": [
+    33,
+    34,
+    35
+  ]
+}

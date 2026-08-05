@@ -8,6 +8,43 @@ import '../models/traffic_record.dart';
 import '../models/traffic_snapshot.dart';
 import 'flowsense_api.dart';
 
+/// Demo-only staging that does not belong to the API contract.
+///
+/// A real backend serves whatever the connectors actually sent. The fake has
+/// to *manufacture* the interesting failures, because a demo that only ever
+/// shows the happy path proves nothing — and the layout spec's hardest
+/// requirements (`Data basi`, the un-interpolated gap in the history chart)
+/// are precisely the ones you cannot see when everything is working.
+class DemoStaging {
+  const DemoStaging({
+    this.stalledCameras = const {},
+    this.stalledBy = const Duration(minutes: 4),
+    this.historyGapAgoMinutes = const {},
+  });
+
+  factory DemoStaging.fromJson(Map<String, dynamic> json) => DemoStaging(
+        stalledCameras: {
+          for (final e in (json['stalledCameras'] as List? ?? const [])) '$e',
+        },
+        stalledBy: Duration(
+          seconds: (json['stalledBySeconds'] as num?)?.toInt() ?? 240,
+        ),
+        historyGapAgoMinutes: {
+          for (final e in (json['historyGapAgoMinutes'] as List? ?? const []))
+            (e as num).toInt(),
+        },
+      );
+
+  /// Cameras whose records are served [stalledBy] old, so the stale path is
+  /// reachable without unplugging anything.
+  final Set<String> stalledCameras;
+  final Duration stalledBy;
+
+  /// Minutes-ago positions omitted from [FlowSenseApi.history], so the chart's
+  /// "Data hilang" rendering is reachable too.
+  final Set<int> historyGapAgoMinutes;
+}
+
 /// A [FlowSenseApi] backed by connector fixtures instead of a backend.
 ///
 /// Two jobs. It keeps the whole app buildable and demoable before the HTTP
@@ -16,12 +53,14 @@ import 'flowsense_api.dart';
 ///
 /// Records are re-stamped to the current time as they are served. Fixture
 /// timestamps are months old; replaying them verbatim would render every
-/// marker stale and grey, which is the opposite of what a demo needs.
+/// marker stale and grey, which is the opposite of what a demo needs — except
+/// for the cameras [DemoStaging] deliberately holds back.
 class FakeFlowSenseApi implements FlowSenseApi {
   FakeFlowSenseApi({
     required List<Intersection> intersections,
     required List<TrafficRecord> records,
     DateTime Function()? now,
+    this.staging = const DemoStaging(),
   })  : _intersections = List.unmodifiable(intersections),
         _byCamera = _group(records),
         _now = now ?? DateTime.now;
@@ -31,6 +70,7 @@ class FakeFlowSenseApi implements FlowSenseApi {
   factory FakeFlowSenseApi.fromStrings({
     required String intersectionsJson,
     required String recordsJsonl,
+    String? demoJson,
     DateTime Function()? now,
   }) {
     final rawIntersections = jsonDecode(intersectionsJson);
@@ -46,6 +86,9 @@ class FakeFlowSenseApi implements FlowSenseApi {
             TrafficRecord.fromJson(
                 jsonDecode(line) as Map<String, dynamic>),
       ],
+      staging: demoJson == null
+          ? const DemoStaging()
+          : DemoStaging.fromJson(jsonDecode(demoJson) as Map<String, dynamic>),
       now: now,
     );
   }
@@ -57,9 +100,11 @@ class FakeFlowSenseApi implements FlowSenseApi {
         await rootBundle.loadString('test/fixtures/intersections.json');
     final recordsJsonl =
         await rootBundle.loadString('test/fixtures/records.jsonl');
+    final demoJson = await rootBundle.loadString('test/fixtures/demo.json');
     return FakeFlowSenseApi.fromStrings(
       intersectionsJson: intersectionsJson,
       recordsJsonl: recordsJsonl,
+      demoJson: demoJson,
       now: now,
     );
   }
@@ -78,6 +123,7 @@ class FakeFlowSenseApi implements FlowSenseApi {
   final List<Intersection> _intersections;
   final Map<String, List<TrafficRecord>> _byCamera;
   final DateTime Function() _now;
+  final DemoStaging staging;
 
   /// Number of upcoming calls that will throw. Decrements per failed call, so
   /// `failNext = 2` reproduces "two failures then recovery".
@@ -108,12 +154,22 @@ class FakeFlowSenseApi implements FlowSenseApi {
     final records = <TrafficRecord>[];
     for (final entry in _byCamera.entries) {
       final series = entry.value;
-      records.add(_restamp(series[_tick % series.length], at));
+      final ts = staging.stalledCameras.contains(entry.key)
+          ? at.subtract(staging.stalledBy)
+          : at;
+      records.add(_restamp(series[_tick % series.length], ts));
     }
     _tick++;
     return TrafficSnapshot(fetchedAt: at, records: records);
   }
 
+  /// One point per minute across the requested window, oldest first — the
+  /// shape a real time-bucketed endpoint returns, so the chart is exercised
+  /// against 60 points rather than however many fixture lines happen to exist.
+  ///
+  /// Minutes listed in [DemoStaging.historyGapAgoMinutes] are **omitted**, not
+  /// zeroed. A gap has to arrive as an absent bucket, because that is the one
+  /// case the chart must refuse to interpolate over.
   @override
   Future<List<TrafficRecord>> history(
     String id, {
@@ -123,14 +179,20 @@ class FakeFlowSenseApi implements FlowSenseApi {
   }) async {
     _maybeFail();
     final series = _byCamera[id] ?? const <TrafficRecord>[];
+    if (series.isEmpty) return const [];
+
     final end = to ?? _now();
-    // One point per minute, ending at `end`, oldest first.
+    final start = from ?? end.subtract(const Duration(hours: 1));
+    final minutes = end.difference(start).inMinutes;
+    if (minutes <= 0) return const [];
+
     return [
-      for (var i = 0; i < series.length; i++)
-        _restamp(
-          series[i],
-          end.subtract(Duration(minutes: series.length - 1 - i)),
-        ),
+      for (var ago = minutes - 1; ago >= 0; ago--)
+        if (!staging.historyGapAgoMinutes.contains(ago))
+          _restamp(
+            series[(minutes - ago) % series.length],
+            end.subtract(Duration(minutes: ago)),
+          ),
     ];
   }
 

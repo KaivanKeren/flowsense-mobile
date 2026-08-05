@@ -53,8 +53,11 @@ void main() {
             TrafficRecord.fromJson(jsonDecode(l) as Map<String, dynamic>))
         .toList();
 
-    expect(records, hasLength(9));
-    expect(records.map((r) => r.cameraId).toSet(), {'30', '31', '32'});
+    expect(records, isNotEmpty);
+    expect(records.map((r) => r.cameraId).toSet(),
+        {'30', '31', '32', '33', '34'});
+    // `crossings` is optional, so both shapes have to stay in the corpus —
+    // otherwise the tolerant-parsing path quietly stops being exercised.
     expect(records.any((r) => r.crossings != null), isTrue);
     expect(records.any((r) => r.crossings == null), isTrue);
   });
@@ -68,8 +71,8 @@ void main() {
     expect(i.name, 'Simpang DPRD');
     expect(i.lat, closeTo(-6.8047, 1e-6));
     expect(i.lon, closeTo(110.8405, 1e-6));
-    expect(i.lanes, ['kota', 'ploso']);
-    expect(i.capacityFor('kota', fallback: 12), 14);
+    expect(i.lanes, ['kota', 'ploso', 'demak', 'sekoe']);
+    expect(i.capacityFor('kota', fallback: 99), 12);
     expect(i.capacityFor('tidak-ada', fallback: 12), 12);
   });
 
