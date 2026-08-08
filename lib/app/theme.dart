@@ -46,6 +46,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     required this.textFaint,
     required this.faintInk,
     required this.errorInk,
+    required this.errorPill,
   });
 
   /// The layout spec's token table, verbatim except for [textFaint].
@@ -69,6 +70,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     textFaint: Color(0xFF6D7272),
     faintInk: Color(0xFF9AA0A0),
     errorInk: Color(0xFFB3261E),
+    errorPill: PillColors(tint: Color(0xFFF6E5E4), ink: Color(0xFFB3261E)),
   );
 
   /// Page background.
@@ -102,6 +104,16 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
   /// This is 6.09:1 and visibly a different red.
   final Color errorInk;
 
+  /// [errorInk] as a pill, for connector states that need attention.
+  ///
+  /// The reference images give connector health the congestion palette —
+  /// green `Berjalan`, amber `Terputus`, red `Berhenti`. That cannot be taken
+  /// literally: on the dashboard a health mark sits on the same row as a
+  /// congestion pill, and a green dot beside a green `Lancar` would make green
+  /// mean two different things at once. Health states carry their word plus
+  /// this one non-congestion red; the word is what distinguishes them.
+  final PillColors errorPill;
+
   static FlowSurfaces of(BuildContext context) =>
       Theme.of(context).extension<FlowSurfaces>() ?? light;
 
@@ -116,6 +128,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     Color? textFaint,
     Color? faintInk,
     Color? errorInk,
+    PillColors? errorPill,
   }) =>
       FlowSurfaces(
         page: page ?? this.page,
@@ -127,6 +140,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
         textFaint: textFaint ?? this.textFaint,
         faintInk: faintInk ?? this.faintInk,
         errorInk: errorInk ?? this.errorInk,
+        errorPill: errorPill ?? this.errorPill,
       );
 
   @override
@@ -142,6 +156,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
       textFaint: Color.lerp(textFaint, other.textFaint, t)!,
       faintInk: Color.lerp(faintInk, other.faintInk, t)!,
       errorInk: Color.lerp(errorInk, other.errorInk, t)!,
+      errorPill: t < 0.5 ? errorPill : other.errorPill,
     );
   }
 }
