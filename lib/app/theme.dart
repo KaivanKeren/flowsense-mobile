@@ -45,6 +45,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     required this.textSecondary,
     required this.textFaint,
     required this.faintInk,
+    required this.errorInk,
   });
 
   /// The layout spec's token table, verbatim except for [textFaint].
@@ -67,6 +68,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     textSecondary: Color(0xFF6B706E),
     textFaint: Color(0xFF6D7272),
     faintInk: Color(0xFF9AA0A0),
+    errorInk: Color(0xFFB3261E),
   );
 
   /// Page background.
@@ -90,6 +92,16 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
   /// `#9AA0A0` for non-text use only: icons, handles, hairline accents.
   final Color faintInk;
 
+  /// Failed sign-in, rejected input — a form telling the user something is
+  /// wrong.
+  ///
+  /// **Not `macet`.** The congestion reds are reserved for congestion, and the
+  /// operator console is exactly where that rule is most tempting to break
+  /// because the screens are denser. It would also fail on its own terms:
+  /// `#D64541` measures 4.09:1 as text on the page, below the 4.5:1 floor.
+  /// This is 6.09:1 and visibly a different red.
+  final Color errorInk;
+
   static FlowSurfaces of(BuildContext context) =>
       Theme.of(context).extension<FlowSurfaces>() ?? light;
 
@@ -103,6 +115,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     Color? textSecondary,
     Color? textFaint,
     Color? faintInk,
+    Color? errorInk,
   }) =>
       FlowSurfaces(
         page: page ?? this.page,
@@ -113,6 +126,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
         textSecondary: textSecondary ?? this.textSecondary,
         textFaint: textFaint ?? this.textFaint,
         faintInk: faintInk ?? this.faintInk,
+        errorInk: errorInk ?? this.errorInk,
       );
 
   @override
@@ -127,6 +141,7 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       textFaint: Color.lerp(textFaint, other.textFaint, t)!,
       faintInk: Color.lerp(faintInk, other.faintInk, t)!,
+      errorInk: Color.lerp(errorInk, other.errorInk, t)!,
     );
   }
 }
@@ -397,6 +412,14 @@ ThemeData flowSenseTheme({Brightness brightness = Brightness.light}) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         elevation: 0,
+        // Ink, not the seeded blue. The primary action reads as weight rather
+        // than hue, which keeps colour on these screens meaning congestion and
+        // nothing else — and `textPrimary` is already in the token table, so
+        // this introduces no new value.
+        backgroundColor: surfaces.textPrimary,
+        foregroundColor: surfaces.card,
+        disabledBackgroundColor: surfaces.roadLine,
+        disabledForegroundColor: surfaces.textFaint,
         textStyle: text.labelLarge,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(FlowRadius.control),

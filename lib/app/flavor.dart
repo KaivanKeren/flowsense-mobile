@@ -8,7 +8,9 @@ import '../data/api/flowsense_api.dart';
 import '../data/api/http_flowsense_api.dart';
 import '../features/alerts/notifier.dart';
 import '../features/operator/dashboard_screen.dart';
+import '../features/operator/login_screen.dart';
 import '../features/shell/warga_shell.dart';
+import '../state/auth_providers.dart';
 import '../state/providers.dart';
 import 'theme.dart';
 
@@ -33,8 +35,29 @@ enum Flavor {
 /// already looking at the dashboard that would have raised it.
 Widget homeFor(Flavor flavor) => switch (flavor) {
       Flavor.warga => const JamAlertListener(child: WargaShell()),
-      Flavor.operator => const DashboardScreen(),
+      Flavor.operator => const OperatorGate(),
     };
+
+/// Login, or the console — never both, and never the console first.
+///
+/// The console is gated rather than merely *linked to* a login screen: an
+/// operator build that rendered the dashboard before checking the session
+/// would start polling with no credentials and paper the screen in errors.
+class OperatorGate extends ConsumerWidget {
+  const OperatorGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => switch (
+      ref.watch(authProvider)) {
+        // A stored token is being checked. Showing the login form here would
+        // flash it at somebody who is already signed in.
+        AuthRestoring() => const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+        AuthSignedOut() => const LoginScreen(),
+        AuthSignedIn() => const DashboardScreen(),
+      };
+}
 
 /// Picks the API implementation for [config].
 ///
