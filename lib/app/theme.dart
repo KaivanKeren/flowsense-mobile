@@ -287,16 +287,6 @@ class CongestionColors extends ThemeExtension<CongestionColors> {
   }
 }
 
-/// Copy is plain Indonesian, sentence case, no exclamation marks, no emoji.
-extension CongestionLabel on CongestionLevel {
-  String get label => switch (this) {
-        CongestionLevel.lancar => 'Lancar',
-        CongestionLevel.padat => 'Padat',
-        CongestionLevel.macet => 'Macet',
-        CongestionLevel.unknown => 'Tidak ada data',
-      };
-}
-
 /// What the status pill says.
 ///
 /// Staleness outranks the level, and deliberately so: a `macet` reading from

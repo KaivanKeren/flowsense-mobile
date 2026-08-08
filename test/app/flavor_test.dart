@@ -120,7 +120,8 @@ void main() {
 
     expect(find.byType(DashboardScreen), findsOneWidget);
     expect(find.byType(MapScreen), findsNothing);
-    expect(find.text('Dashboard'), findsOneWidget);
+    // Twice over: the screen's own title, and its tab in the bar below.
+    expect(find.text('Dashboard'), findsNWidgets(2));
   });
 
   testWidgets('a signed-out operator lands on login, not the console',

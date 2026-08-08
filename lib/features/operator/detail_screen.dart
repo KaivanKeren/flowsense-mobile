@@ -14,6 +14,7 @@ import '../../state/providers.dart';
 import '../common/feed_view.dart';
 import '../common/stale_banner.dart';
 import '../common/status_pill.dart';
+import 'kalibrasi_screen.dart';
 
 /// One intersection, in the depth an operator needs.
 ///
@@ -41,7 +42,23 @@ class DetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: surfaces.page,
-      appBar: AppBar(title: Text(intersection?.name ?? 'Simpang')),
+      appBar: AppBar(
+        title: Text(intersection?.name ?? 'Simpang'),
+        actions: [
+          if (intersection != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => KalibrasiScreen(cameraId: cameraId),
+                  ),
+                ),
+                child: const Text('Kalibrasi'),
+              ),
+            ),
+        ],
+      ),
       body: MaxWidth448(
         child: Builder(
           key: const ValueKey('detail-body'),

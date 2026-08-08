@@ -7,7 +7,8 @@ import '../data/api/fake_flowsense_api.dart';
 import '../data/api/flowsense_api.dart';
 import '../data/api/http_flowsense_api.dart';
 import '../features/alerts/notifier.dart';
-import '../features/operator/dashboard_screen.dart';
+import '../features/operator/operator_shell.dart';
+import '../features/operator/session_watcher.dart';
 import '../features/operator/login_screen.dart';
 import '../features/shell/warga_shell.dart';
 import '../state/auth_providers.dart';
@@ -55,7 +56,7 @@ class OperatorGate extends ConsumerWidget {
             body: Center(child: CircularProgressIndicator()),
           ),
         AuthSignedOut() => const LoginScreen(),
-        AuthSignedIn() => const DashboardScreen(),
+        AuthSignedIn() => const SessionWatcher(child: OperatorShell()),
       };
 }
 

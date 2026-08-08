@@ -126,6 +126,19 @@ void main() {
     });
   });
 
+  group('calibration', () {
+    testWidgets('the header offers Kalibrasi, and it goes somewhere real',
+        (tester) async {
+      await _pump(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Kalibrasi'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kalibrasi — Simpang DPRD'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Simpan'), findsOneWidget);
+    });
+  });
+
   group('camera panel', () {
     testWidgets('never sits silent — it says which state it is in',
         (tester) async {

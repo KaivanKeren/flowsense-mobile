@@ -15,6 +15,7 @@ class OperatorAlert {
     required this.raisedAt,
     this.acknowledgedBy,
     this.acknowledgedAt,
+    this.note,
   });
 
   factory OperatorAlert.fromJson(Map<String, dynamic> json) => OperatorAlert(
@@ -30,6 +31,7 @@ class OperatorAlert {
         acknowledgedAt: json['acknowledged_at'] == null
             ? null
             : _epochSeconds(json['acknowledged_at']),
+        note: json['note'] as String?,
       );
 
   static DateTime _epochSeconds(Object? raw) =>
@@ -47,6 +49,10 @@ class OperatorAlert {
   /// Who acknowledged it. Null while it still needs attention.
   final String? acknowledgedBy;
   final DateTime? acknowledgedAt;
+
+  /// What the operator wrote down, if anything — `Ada perbaikan jalan`.
+  /// Free text, and the only part of an alert a person authors.
+  final String? note;
 
   bool get isAcknowledged => acknowledgedBy != null;
 
@@ -70,6 +76,7 @@ class OperatorAlert {
         raisedAt: raisedAt,
         acknowledgedBy: by,
         acknowledgedAt: at,
+        note: note,
       );
 
   Map<String, dynamic> toJson() => {
@@ -81,6 +88,7 @@ class OperatorAlert {
         if (acknowledgedBy != null) 'acknowledged_by': acknowledgedBy,
         if (acknowledgedAt != null)
           'acknowledged_at': acknowledgedAt!.millisecondsSinceEpoch ~/ 1000,
+        if (note != null) 'note': note,
       };
 }
 

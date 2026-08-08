@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../domain/congestion.dart';
 import '../../domain/history.dart';
 import '../../domain/lane_label.dart';
 
