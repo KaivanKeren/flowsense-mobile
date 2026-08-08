@@ -120,7 +120,7 @@ void main() {
 
     expect(find.byType(DashboardScreen), findsOneWidget);
     expect(find.byType(MapScreen), findsNothing);
-    expect(find.text('Papan operator'), findsOneWidget);
+    expect(find.text('Dashboard'), findsOneWidget);
   });
 
   testWidgets('a signed-out operator lands on login, not the console',

@@ -10,11 +10,16 @@ import '../../data/models/traffic_record.dart';
 import '../../data/models/traffic_snapshot.dart';
 import '../../data/repository/traffic_repository.dart';
 import '../../domain/congestion.dart';
+import '../../domain/lane_label.dart';
+import '../../domain/operator_alert.dart';
+import '../../domain/status_summary.dart';
+import '../../state/alert_providers.dart';
+import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import '../common/failure_state.dart';
 import '../common/feed_view.dart';
 import '../common/stale_banner.dart';
-import 'history_chart.dart';
-import 'lane_bars.dart';
+import '../common/status_pill.dart';
 
 /// One intersection as the operator list sees it.
 class IntersectionStatus {
@@ -31,15 +36,39 @@ class IntersectionStatus {
   final bool isStale;
 
   int get totalVehicles => record?.totalVehicles ?? 0;
+
+  /// The approach carrying the intersection's level, or null when there is no
+  /// lane data to name one.
+  String? get worstLane {
+    final perLane = record?.perLane;
+    if (perLane == null || perLane.isEmpty) return null;
+
+    String? worst;
+    var worstRatio = -1.0;
+    for (final lane in intersection.orderedLanes(perLane.keys)) {
+      final capacity = intersection.capacityFor(lane, fallback: 12);
+      if (capacity <= 0) continue;
+      final ratio = perLane[lane]! / capacity;
+      if (ratio > worstRatio) {
+        worstRatio = ratio;
+        worst = lane;
+      }
+    }
+    return worst;
+  }
 }
 
 /// Worst first — the whole point of the dashboard is that the intersection
 /// needing attention is at the top without anyone scrolling for it.
 ///
+/// This is the compensation for losing the wide table a desktop console would
+/// have: on a phone you cannot see everything at once, so ordering has to put
+/// what matters on the first screen.
+///
 /// A camera with no usable data sorts **last**, not first: a dead feed is not
 /// an emergency, and letting `unknown` head the list would bury a real jam.
-/// Ties break on volume then name, so the list does not reshuffle between polls
-/// when two intersections share a level.
+/// Ties break on volume then name, so the list does not reshuffle between
+/// polls when two intersections share a level.
 List<IntersectionStatus> rankWorstFirst({
   required List<Intersection> intersections,
   required TrafficSnapshot snapshot,
@@ -49,26 +78,18 @@ List<IntersectionStatus> rankWorstFirst({
 }) {
   final rows = [
     for (final intersection in intersections)
-      () {
-        final record = snapshot.forCamera(intersection.id);
-        return IntersectionStatus(
-          intersection: intersection,
-          record: record,
-          level: record == null
-              ? CongestionLevel.unknown
-              : levelForIntersection(
-                  record,
-                  intersection,
-                  laneCapacityDefault: laneCapacityDefault,
-                ),
-          isStale: record == null || isStale(record, now, staleAfter),
-        );
-      }(),
+      _statusFor(
+        intersection,
+        snapshot,
+        now,
+        staleAfter,
+        laneCapacityDefault,
+      ),
   ];
 
   rows.sort((a, b) {
-    final bySeverity = b.level.severity.compareTo(a.level.severity);
-    if (bySeverity != 0) return bySeverity;
+    final byLevel = _rank(b).compareTo(_rank(a));
+    if (byLevel != 0) return byLevel;
     final byVolume = b.totalVehicles.compareTo(a.totalVehicles);
     if (byVolume != 0) return byVolume;
     return a.intersection.name.compareTo(b.intersection.name);
@@ -76,24 +97,88 @@ List<IntersectionStatus> rankWorstFirst({
   return rows;
 }
 
-/// The operator view: every intersection ranked worst-first, each with its
-/// per-lane split, and an hour of history for whichever one is open.
+/// A stale row ranks below every live one, whatever level it last reported.
+int _rank(IntersectionStatus s) => s.isStale ? -1 : s.level.severity;
+
+IntersectionStatus _statusFor(
+  Intersection intersection,
+  TrafficSnapshot snapshot,
+  DateTime now,
+  Duration staleAfter,
+  int laneCapacityDefault,
+) {
+  final record = snapshot.forCamera(intersection.id);
+  return IntersectionStatus(
+    intersection: intersection,
+    record: record,
+    level: record == null
+        ? CongestionLevel.unknown
+        : levelForIntersection(
+            record,
+            intersection,
+            laneCapacityDefault: laneCapacityDefault,
+          ),
+    isStale: record == null || isStale(record, now, staleAfter),
+  );
+}
+
+/// The operator console's home.
 ///
-/// Read-only, deliberately. Signal control from a phone is a safety question,
-/// not a feature question.
+/// Order is the argument, and it is the reverse of what a desktop dashboard
+/// would do: the summary, then **active alerts**, then the intersection list.
+/// On a phone what needs action has to be visible before what needs watching,
+/// so alerts sit above the list rather than beside it.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Papan operator'),
-          actions: [if (ref.watch(isDemoProvider)) const DemoBadge()],
-        ),
-        body: MaxWidth448(child: _content(context, ref)),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final surfaces = FlowSurfaces.of(context);
+    final auth = ref.watch(authProvider);
 
-  Widget _content(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: surfaces.page,
+      appBar: AppBar(
+        // The layout doc names the route but not the title; the reference
+        // image labels it `Dashboard`, so the image stands.
+        title: const Text('Dashboard'),
+        titleSpacing: 16,
+        actions: [
+          // Says the numbers are bundled fixtures rather than live traffic.
+          // Never dropped to make room for chrome: degrading to fixtures keeps
+          // a demo alive, doing it silently passes canned data off as real.
+          if (ref.watch(isDemoProvider)) const DemoBadge(),
+          if (auth is AuthSignedIn)
+            Padding(
+              padding: const EdgeInsets.only(right: 16, left: 8),
+              child: Center(
+                child: ConstrainedBox(
+                  // Who is signed in matters for accountability, but not more
+                  // than the screen's own name — the title keeps its room and
+                  // a long operator name ellipsizes instead.
+                  constraints: const BoxConstraints(maxWidth: 120),
+                  child: Text(
+                    auth.operator.nama,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: surfaces.textSecondary),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      body: MaxWidth448(child: _Body()),
+    );
+  }
+}
+
+class _Body extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final surfaces = FlowSurfaces.of(context);
     final intersections = ref.watch(intersectionsProvider).valueOrNull;
     final state = ref.watch(snapshotProvider).valueOrNull;
     final config = ref.watch(appConfigProvider);
@@ -106,23 +191,14 @@ class DashboardScreen extends ConsumerWidget {
     }
 
     final FeedView(:snapshot, :banner) = FeedView.of(state, now);
-
     if (snapshot == null) {
-      return QuietState(
-        title: 'Data tidak dapat dimuat',
-        body: banner ?? 'Coba lagi sebentar.',
-        actionLabel: 'Coba lagi',
-        onAction: retry,
+      return FailureState.noConnection(
+        lastDataText: 'Belum ada data tersimpan',
+        onRetry: retry,
       );
     }
-
-    if (snapshot.isEmpty) {
-      return QuietState(
-        title: 'Belum ada data lalu lintas',
-        body: 'Pastikan konektor kamera sedang berjalan, lalu muat ulang.',
-        actionLabel: 'Muat ulang',
-        onAction: retry,
-      );
+    if (snapshot.records.isEmpty) {
+      return FailureState.noData(onRetry: retry);
     }
 
     final rows = rankWorstFirst(
@@ -132,30 +208,38 @@ class DashboardScreen extends ConsumerWidget {
       staleAfter: config.staleAfter,
       laneCapacityDefault: config.laneCapacityDefault,
     );
-    final selected = ref.watch(selectedIntersectionProvider);
 
     return Column(
       children: [
         if (banner != null) StaleBanner(message: banner, onRetry: retry),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: rows.length,
-            itemBuilder: (context, index) {
-              final status = rows[index];
-              final id = status.intersection.id;
-              return IntersectionCard(
-                status: status,
-                now: now,
-                laneCapacityDefault: config.laneCapacityDefault,
-                isExpanded: selected == id,
-                // Tapping the open card closes it, so the list can be read
-                // without a chart pushing everything else off screen.
-                onTap: () => ref
-                    .read(selectedIntersectionProvider.notifier)
-                    .state = selected == id ? null : id,
-              );
-            },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            children: [
+              _SummaryCard(
+                summary: summarise([
+                  for (final r in rows) (level: r.level, isStale: r.isStale),
+                ]),
+              ),
+              const SizedBox(height: 24),
+              const _AlertsSection(),
+              const SizedBox(height: 24),
+              _SectionHeader(
+                title: 'Simpang',
+                trailing: 'urut terparah dulu',
+              ),
+              const SizedBox(height: 8),
+              _IntersectionCard(rows: rows, now: now),
+              const SizedBox(height: 8),
+              Text(
+                'Konsol ini hanya membaca. Tidak ada kendali lampu lalu '
+                'lintas.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: surfaces.textFaint),
+              ),
+            ],
           ),
         ),
       ],
@@ -163,94 +247,47 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-/// One row of the dashboard. Public so a widget test can read the rendered
-/// order straight off the tree instead of inferring it from text positions.
-class IntersectionCard extends StatelessWidget {
-  const IntersectionCard({
-    super.key,
-    required this.status,
-    required this.now,
-    required this.isExpanded,
-    required this.onTap,
-    this.laneCapacityDefault = 12,
-  });
+/// Four numbers in a row: macet, padat, lancar, tanpa data.
+///
+/// The numbers are neutral ink, never the level colour. Colour on this screen
+/// belongs to the status pills alone — the console is denser than the citizen
+/// app, which makes that rule easier to break and more important to hold.
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.summary});
 
-  final IntersectionStatus status;
-  final DateTime now;
-  final bool isExpanded;
-  final VoidCallback onTap;
-  final int laneCapacityDefault;
+  final StatusSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    final color =
-        status.isStale ? colors.unknown : colors.forLevel(status.level);
+    final surfaces = FlowSurfaces.of(context);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final cells = <(String, int)>[
+      ('Macet', summary.macet),
+      ('Padat', summary.padat),
+      ('Lancar', summary.lancar),
+      ('Tanpa data', summary.tanpaData),
+    ];
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surfaces.card,
+        borderRadius: BorderRadius.circular(FlowRadius.card),
+        border: Border.all(color: surfaces.roadLine),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration:
-                        BoxDecoration(color: color, shape: BoxShape.circle),
+              for (var i = 0; i < cells.length; i++) ...[
+                if (i > 0) VerticalDivider(width: 1, color: surfaces.roadLine),
+                Expanded(
+                  child: _SummaryCell(
+                    label: cells[i].$1,
+                    value: cells[i].$2,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      status.intersection.name,
-                      style: text.titleSmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    '${status.totalVehicles} kendaraan',
-                    style: text.bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Padding(
-                padding: const EdgeInsets.only(left: 20),
-                child: Text(
-                  switch (status.record) {
-                    null => '${status.level.label} · belum ada data',
-                    final record => '${status.level.label} · '
-                        '${relativeIndonesian(now.difference(record.ts))}',
-                  },
-                  style: text.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
-              ),
-              const SizedBox(height: 12),
-              LaneBars(
-                intersection: status.intersection,
-                record: status.record,
-                isStale: status.isStale,
-                laneCapacityDefault: laneCapacityDefault,
-              ),
-              if (isExpanded) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Kendaraan per menit, satu jam terakhir',
-                  style: text.labelMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 8),
-                _HistorySection(cameraId: status.intersection.id, now: now),
               ],
             ],
           ),
@@ -260,38 +297,335 @@ class IntersectionCard extends StatelessWidget {
   }
 }
 
-/// Fetches history only for the card the operator actually opened — polling an
-/// hour of points for every intersection on every rebuild would be wasteful.
-class _HistorySection extends ConsumerWidget {
-  const _HistorySection({required this.cameraId, required this.now});
+class _SummaryCell extends StatelessWidget {
+  const _SummaryCell({required this.label, required this.value});
 
-  final String cameraId;
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return Semantics(
+      label: '$label, $value simpang',
+      excludeSemantics: true,
+      child: Padding(
+        key: ValueKey('summary-$label'),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$value',
+              style: text.displaySmall?.copyWith(color: surfaces.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.trailing});
+
+  final String title;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+          ),
+        ),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+          ),
+      ],
+    );
+  }
+}
+
+class _AlertsSection extends ConsumerWidget {
+  const _AlertsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final surfaces = FlowSurfaces.of(context);
+    final text = Theme.of(context).textTheme;
+    final now = ref.watch(clockProvider).now();
+    final alerts = ref.watch(operatorAlertsProvider);
+
+    final all = alerts.valueOrNull ?? const <OperatorAlert>[];
+    final active = all.where((a) => !a.isAcknowledged).toList();
+    final acknowledged = all.where((a) => a.isAcknowledged).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionHeader(title: 'Peringatan aktif'),
+        const SizedBox(height: 8),
+        if (active.isEmpty)
+          // A sentence saying it is empty, not an empty section.
+          Text(
+            'Tidak ada peringatan aktif',
+            style: text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+          )
+        else
+          for (final alert in active)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AlertCard(alert: alert, now: now),
+            ),
+        // Acknowledged alerts stay on the page. Their history is the
+        // accountability the console exists to provide.
+        for (final alert in acknowledged)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${alert.name} · diakui ${alert.acknowledgedBy} '
+              '${clockTime(alert.acknowledgedAt!)}',
+              style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AlertCard extends ConsumerStatefulWidget {
+  const _AlertCard({required this.alert, required this.now});
+
+  final OperatorAlert alert;
   final DateTime now;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      ref.watch(historyProvider(cameraId)).when(
-            // Same window the provider asked for, so the axis cannot drift
-            // away from the data it is drawing.
-            data: (records) => HistoryChart(
-              records: records,
-              now: now,
-              window: kHistoryWindow,
-            ),
-            loading: () => const SizedBox(
-              height: HistoryChart.height,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, _) => SizedBox(
-              height: HistoryChart.height,
-              child: Center(
-                child: Text(
-                  'Riwayat tidak dapat dimuat.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+  ConsumerState<_AlertCard> createState() => _AlertCardState();
+}
+
+class _AlertCardState extends ConsumerState<_AlertCard> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _acknowledge() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    final failure = await ref
+        .read(operatorAlertsProvider.notifier)
+        .acknowledge(widget.alert.id);
+
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = failure;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+    final text = Theme.of(context).textTheme;
+    final alert = widget.alert;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surfaces.card,
+        borderRadius: BorderRadius.circular(FlowRadius.card),
+        border: Border.all(color: surfaces.roadLine),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(alert.name, style: text.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${alert.level.label} sejak '
+                        '${clockTime(alert.raisedAt)} · '
+                        '${durationIndonesian(alert.age(widget.now))}',
+                        style: text.bodyMedium
+                            ?.copyWith(color: surfaces.textSecondary),
                       ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: _busy ? null : _acknowledge,
+                  child: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Akui'),
+                ),
+              ],
             ),
-          );
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: text.bodySmall?.copyWith(color: surfaces.errorInk),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntersectionCard extends StatelessWidget {
+  const _IntersectionCard({required this.rows, required this.now});
+
+  final List<IntersectionStatus> rows;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surfaces.card,
+        borderRadius: BorderRadius.circular(FlowRadius.card),
+        border: Border.all(color: surfaces.roadLine),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: surfaces.roadLine),
+            _IntersectionRow(status: rows[i], now: now),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Two tiers: identity on the first line, the supporting numbers on the second
+/// as secondary text separated by middots.
+///
+/// This is what a wide desktop table becomes on a 360 px phone. Minimum height
+/// 56 so the touch target still clears 44 even when both lines are short.
+class _IntersectionRow extends StatelessWidget {
+  const _IntersectionRow({required this.status, required this.now});
+
+  final IntersectionStatus status;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+    final text = Theme.of(context).textTheme;
+    final record = status.record;
+
+    final facts = status.isStale
+        ? (record == null
+            ? 'Belum ada data'
+            : 'Data terakhir ${relativeIndonesian(now.difference(record.ts))}')
+        : [
+            '${status.totalVehicles} kendaraan',
+            if (status.worstLane != null)
+              laneLabel(status.worstLane!).toLowerCase(),
+            relativeIndonesian(now.difference(record!.ts)),
+          ].join(' · ');
+
+    final row = Container(
+      key: ValueKey('row-${status.intersection.id}'),
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        status.intersection.name,
+                        style: text.titleMedium,
+                      ),
+                    ),
+                    if (status.isStale) ...[
+                      const SizedBox(width: 8),
+                      // Shown only when something is wrong, and in the error
+                      // ink rather than the congestion red — those four hues
+                      // mean congestion and nothing else.
+                      _HealthDot(color: surfaces.errorInk),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  facts,
+                  style:
+                      text.bodySmall?.copyWith(color: surfaces.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          StatusPill(level: status.level, isStale: status.isStale),
+        ],
+      ),
+    );
+
+    return Semantics(
+      label: '${status.intersection.name}, '
+          '${statusLabel(status.level, isStale: status.isStale).toLowerCase()}, '
+          '$facts',
+      excludeSemantics: true,
+      child: status.isStale
+          // Dimmed, because a row you cannot trust should not compete with the
+          // rows you can.
+          ? Opacity(opacity: 0.6, child: row)
+          : row,
+    );
+  }
+}
+
+class _HealthDot extends StatelessWidget {
+  const _HealthDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
 }
