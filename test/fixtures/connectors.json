@@ -1,0 +1,45 @@
+{
+  "_comment": "Demo staging for FakeHealthApi, not part of the API contract. Times are offsets from now rather than absolute stamps, so the demo stays alive whenever it is run. Camera 34 is stopped to match the stalled camera in demo.json — the dashboard and this screen have to agree about which connector is dead.",
+  "connectors": [
+    {
+      "camera_id": "30",
+      "name": "Simpang DPRD",
+      "status": "berjalan",
+      "last_record_seconds_ago": 0,
+      "gap_seconds": 2.0,
+      "failures_per_hour": 0
+    },
+    {
+      "camera_id": "31",
+      "name": "Simpang Tujuh",
+      "status": "berjalan",
+      "last_record_seconds_ago": 2,
+      "gap_seconds": 2.1,
+      "failures_per_hour": 2
+    },
+    {
+      "camera_id": "32",
+      "name": "Simpang Jati",
+      "status": "berjalan",
+      "last_record_seconds_ago": 1,
+      "gap_seconds": 2.0,
+      "failures_per_hour": 0
+    },
+    {
+      "camera_id": "33",
+      "name": "Simpang Bae",
+      "status": "terputus",
+      "last_record_seconds_ago": 55,
+      "gap_seconds": 4.8,
+      "failures_per_hour": 14
+    },
+    {
+      "camera_id": "34",
+      "name": "Simpang Ngembal",
+      "status": "berhenti",
+      "last_record_seconds_ago": 207,
+      "gap_seconds": null,
+      "failures_per_hour": 63
+    }
+  ]
+}

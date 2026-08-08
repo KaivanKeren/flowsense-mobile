@@ -30,11 +30,17 @@ class HistoryBucket {
 /// The lane the chart is currently showing, or null for every approach.
 typedef LaneFilter = String?;
 
-/// Buckets [records] into one slot per minute over the window ending at [end].
+/// Buckets [records] into [count] slots of [bucketSize], ending at [end].
 ///
-/// Missing minutes are emitted as buckets with a null count rather than
-/// dropped, so the chart receives a fixed-length series and never has to guess
-/// where a gap was. **Nothing is interpolated.**
+/// Missing slots are emitted with a null count rather than dropped, so the
+/// chart receives a fixed-length series and never has to guess where a gap
+/// was. **Nothing is interpolated.**
+///
+/// The defaults are the citizen app's hour of one-minute slots. The operator
+/// console asks for 96 fifteen-minute slots — a full day. Aggregating to a
+/// coarser bucket is exactly why this takes a size rather than assuming
+/// minutes: 288 five-minute points on a 360 px screen is a blur, and the
+/// layout spec rules it out by name.
 ///
 /// When [lane] is given, the height and the level are computed for that
 /// approach alone, against that approach's own calibrated capacity.
@@ -42,28 +48,29 @@ List<HistoryBucket> bucketHistory({
   required List<TrafficRecord> records,
   required Intersection intersection,
   required DateTime end,
-  int minutes = 60,
+  int count = 60,
+  Duration bucketSize = const Duration(minutes: 1),
   LaneFilter lane,
   int laneCapacityDefault = 12,
 }) {
-  final lastMinute = _floorToMinute(end);
+  final lastSlot = _floorTo(end, bucketSize);
 
-  // Latest record wins when a minute somehow carries more than one — the chart
-  // shows the most recent state of that minute, matching the map.
-  final byMinute = <DateTime, TrafficRecord>{};
+  // Latest record wins when a slot carries more than one — the chart shows the
+  // most recent state of that slot, matching the map.
+  final bySlot = <DateTime, TrafficRecord>{};
   for (final record in records) {
-    final key = _floorToMinute(record.ts);
-    final existing = byMinute[key];
+    final key = _floorTo(record.ts, bucketSize);
+    final existing = bySlot[key];
     if (existing == null || record.ts.isAfter(existing.ts)) {
-      byMinute[key] = record;
+      bySlot[key] = record;
     }
   }
 
   return [
-    for (var ago = minutes - 1; ago >= 0; ago--)
+    for (var ago = count - 1; ago >= 0; ago--)
       () {
-        final minute = lastMinute.subtract(Duration(minutes: ago));
-        final record = byMinute[minute];
+        final minute = lastSlot.subtract(bucketSize * ago);
+        final record = bySlot[minute];
         if (record == null) {
           return HistoryBucket(
             minute: minute,
@@ -104,11 +111,19 @@ List<HistoryBucket> bucketHistory({
   ];
 }
 
-DateTime _floorToMinute(DateTime t) =>
-    DateTime.fromMillisecondsSinceEpoch(
-      t.millisecondsSinceEpoch - t.millisecondsSinceEpoch % 60000,
-      isUtc: t.isUtc,
-    );
+/// Snaps [t] down to the start of the [size] slot containing it.
+///
+/// Anchored to the epoch rather than to `end`, so the slot boundaries of a
+/// 15-minute chart land on :00, :15, :30 and :45 whatever time the request was
+/// made — two operators looking at the same jam see the same bars.
+DateTime _floorTo(DateTime t, Duration size) {
+  final ms = size.inMilliseconds;
+  if (ms <= 0) return t;
+  return DateTime.fromMillisecondsSinceEpoch(
+    t.millisecondsSinceEpoch - t.millisecondsSinceEpoch % ms,
+    isUtc: t.isUtc,
+  );
+}
 
 /// `16:05`, in the phone's local reading of the timestamp.
 String hourMinute(DateTime t) =>

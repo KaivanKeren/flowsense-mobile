@@ -5,11 +5,15 @@ import 'package:flowsense_mobile/core/clock.dart';
 import 'package:flowsense_mobile/core/config/app_config.dart';
 import 'package:flowsense_mobile/data/api/fake_flowsense_api.dart';
 import 'package:flowsense_mobile/data/api/http_flowsense_api.dart';
+import 'package:flowsense_mobile/data/auth/fake_auth_api.dart';
+import 'package:flowsense_mobile/data/auth/token_store.dart';
 import 'package:flowsense_mobile/features/alerts/notifier.dart';
 import 'package:flowsense_mobile/features/common/feed_view.dart';
 import 'package:flowsense_mobile/features/map/map_screen.dart';
 import 'package:flowsense_mobile/features/operator/dashboard_screen.dart';
+import 'package:flowsense_mobile/features/operator/login_screen.dart';
 import 'package:flowsense_mobile/features/shell/warga_shell.dart';
+import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,8 +33,16 @@ FakeFlowSenseApi _api() => FakeFlowSenseApi.fromStrings(
       now: () => _t0,
     );
 
-Future<void> _pumpApp(WidgetTester tester, Flavor flavor,
-    {AppConfig config = _configured}) async {
+Future<void> _pumpApp(
+  WidgetTester tester,
+  Flavor flavor, {
+  AppConfig config = _configured,
+  /// Operator only. A stored token means the gate opens onto the console;
+  /// without one it opens onto the login screen, which is the whole point of
+  /// the gate.
+  bool signedIn = true,
+}) async {
+  final authApi = FakeAuthApi();
   await tester.pumpWidget(ProviderScope(
     overrides: [
       appConfigProvider.overrideWithValue(config),
@@ -40,6 +52,12 @@ Future<void> _pumpApp(WidgetTester tester, Flavor flavor,
       // The warga shell wires up jam alerts. Nothing here should reach a
       // platform channel, and this makes that a guarantee rather than a hope.
       alertNotifierProvider.overrideWithValue(FakeAlertNotifier()),
+      // Neither does the token store: `SecureTokenStore` would go to the
+      // Keystore over a method channel.
+      authApiProvider.overrideWithValue(authApi),
+      tokenStoreProvider.overrideWithValue(
+        FakeTokenStore(signedIn ? authApi.token : null),
+      ),
     ],
     child: FlowSenseApp(flavor: flavor),
   ));
@@ -97,12 +115,32 @@ void main() {
     expect(app.themeMode, ThemeMode.light);
   });
 
-  testWidgets('the operator flavor lands on the dashboard', (tester) async {
+  testWidgets('a signed-in operator lands on the dashboard', (tester) async {
     await _pumpApp(tester, Flavor.operator);
 
     expect(find.byType(DashboardScreen), findsOneWidget);
     expect(find.byType(MapScreen), findsNothing);
-    expect(find.text('Papan operator'), findsOneWidget);
+    // Twice over: the screen's own title, and its tab in the bar below.
+    expect(find.text('Dashboard'), findsNWidgets(2));
+  });
+
+  testWidgets('a signed-out operator lands on login, not the console',
+      (tester) async {
+    // The console must never render before the session is checked: it would
+    // start polling with no credentials and paper the screen in errors.
+    await _pumpApp(tester, Flavor.operator, signedIn: false);
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(DashboardScreen), findsNothing);
+  });
+
+  testWidgets('the citizen flavor has no login at all', (tester) async {
+    // No account, no identity, no auth layer — for the warga build that is a
+    // deliberate deletion, not an omission.
+    await _pumpApp(tester, Flavor.warga, signedIn: false);
+
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(WargaShell), findsOneWidget);
   });
 
   testWidgets('a configured build shows no demo badge', (tester) async {

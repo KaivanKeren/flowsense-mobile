@@ -63,3 +63,17 @@ CongestionLevel levelForIntersection(
 /// edge device and the phone should not paint the map grey.
 bool isStale(TrafficRecord record, DateTime now, Duration staleAfter) =>
     now.difference(record.ts) > staleAfter;
+
+/// Copy is plain Indonesian, sentence case, no exclamation marks, no emoji.
+///
+/// Lives in `domain/` rather than the theme: it is text, not styling, and the
+/// alert history needs it without dragging `package:flutter` into a pure
+/// filter.
+extension CongestionLabel on CongestionLevel {
+  String get label => switch (this) {
+        CongestionLevel.lancar => 'Lancar',
+        CongestionLevel.padat => 'Padat',
+        CongestionLevel.macet => 'Macet',
+        CongestionLevel.unknown => 'Tidak ada data',
+      };
+}

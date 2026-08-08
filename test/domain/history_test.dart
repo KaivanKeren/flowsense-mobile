@@ -48,7 +48,7 @@ void main() {
         records: [_at(0, {'kota': 4, 'ploso': 2})],
         intersection: _simpang,
         end: _end,
-        minutes: 3,
+        count: 3,
       );
 
       expect(buckets[0].hasData, isFalse);
@@ -66,7 +66,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 5,
+        count: 5,
       );
 
       // Minutes 1-3 sit between two real readings and stay empty.
@@ -78,7 +78,7 @@ void main() {
         records: [_at(0, {'kota': 9, 'ploso': 1})], // 9/12 = 0.75 -> macet
         intersection: _simpang,
         end: _end,
-        minutes: 1,
+        count: 1,
       );
       expect(buckets.single.level, CongestionLevel.macet);
       expect(buckets.single.count, 10);
@@ -91,13 +91,13 @@ void main() {
         records: records,
         intersection: _simpang,
         end: _end,
-        minutes: 1,
+        count: 1,
       ).single;
       final ploso = bucketHistory(
         records: records,
         intersection: _simpang,
         end: _end,
-        minutes: 1,
+        count: 1,
         lane: 'ploso',
       ).single;
 
@@ -113,7 +113,7 @@ void main() {
         records: [_at(0, {'kota': 5})],
         intersection: _simpang,
         end: _end,
-        minutes: 1,
+        count: 1,
         lane: 'ploso',
       );
       expect(buckets.single.hasData, isFalse);
@@ -139,10 +139,75 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 2,
+        count: 2,
       );
       // Both records fall in the minute before `end`; the later one wins.
       expect(buckets.first.count, 8);
+    });
+
+    group('coarser buckets, for the operator console', () {
+      test('96 fifteen-minute slots cover a full day', () {
+        final buckets = bucketHistory(
+          records: const [],
+          intersection: _simpang,
+          end: _end,
+          count: 96,
+          bucketSize: const Duration(minutes: 15),
+        );
+
+        expect(buckets, hasLength(96));
+        expect(
+          buckets.last.minute.difference(buckets.first.minute),
+          const Duration(hours: 23, minutes: 45),
+        );
+      });
+
+      test('slot boundaries land on :00, :15, :30, :45', () {
+        // Anchored to the epoch, not to `end` — two operators looking at the
+        // same jam have to see the same bars.
+        final buckets = bucketHistory(
+          records: const [],
+          intersection: _simpang,
+          // 16:37 is deliberately not on a boundary.
+          end: DateTime.utc(2026, 8, 4, 16, 37),
+          count: 4,
+          bucketSize: const Duration(minutes: 15),
+        );
+
+        expect(buckets.map((b) => b.minute.minute), [45, 0, 15, 30]);
+      });
+
+      test('several records inside one slot collapse to the latest', () {
+        final buckets = bucketHistory(
+          records: [
+            _at(14, {'kota': 2, 'ploso': 1}),
+            _at(2, {'kota': 9, 'ploso': 1}),
+          ],
+          intersection: _simpang,
+          end: _end,
+          count: 1,
+          bucketSize: const Duration(minutes: 15),
+        );
+
+        // _end is 16:30, so the single slot is 16:30-16:45 and only the
+        // 16:28 record... both fall before it. The slot is therefore empty,
+        // which is the honest answer rather than a borrowed reading.
+        expect(buckets.single.hasData, isFalse);
+      });
+
+      test('a quarter hour with no records is still a gap, not a zero', () {
+        final buckets = bucketHistory(
+          records: [_at(0, {'kota': 4, 'ploso': 2})],
+          intersection: _simpang,
+          end: _end,
+          count: 3,
+          bucketSize: const Duration(minutes: 15),
+        );
+
+        expect(buckets[0].hasData, isFalse);
+        expect(buckets[1].hasData, isFalse);
+        expect(buckets[2].count, 6);
+      });
     });
 
     test('no records at all yields a full window of empties', () {
@@ -168,7 +233,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 5,
+        count: 5,
       );
 
       expect(
@@ -188,7 +253,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 4,
+        count: 4,
       );
       expect(
         historySummary(buckets).any((l) => l.contains('belum ada tanda reda')),
@@ -204,7 +269,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 2,
+        count: 2,
       );
       expect(
         historySummary(buckets).any((l) => l.contains('sejak')),
@@ -221,7 +286,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 3,
+        count: 3,
       );
 
       expect(
@@ -241,7 +306,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 6,
+        count: 6,
       );
 
       expect(
@@ -256,7 +321,7 @@ void main() {
         records: [for (var i = 0; i < 5; i++) _at(i, {'kota': 2, 'ploso': 1})],
         intersection: _simpang,
         end: _end,
-        minutes: 5,
+        count: 5,
       );
       expect(
         historySummary(buckets).any((l) => l.contains('Data tidak masuk')),
@@ -278,7 +343,7 @@ void main() {
         ],
         intersection: _simpang,
         end: _end,
-        minutes: 10,
+        count: 10,
       );
       expect(historySummary(buckets).length, lessThanOrEqualTo(3));
     });

@@ -1,0 +1,41 @@
+{
+  "_comment": "Demo staging for FakeAlertsApi, not part of the API contract. Times are offsets from now, so a demo run always shows a jam that started a plausible while ago. One alert is left unacknowledged on purpose: without it the dashboard's `Akui` button — one of only two writes the console has — is unreachable in a demo.",
+  "alerts": [
+    {
+      "id": "1",
+      "camera_id": "30",
+      "name": "Simpang DPRD",
+      "level": "macet",
+      "raised_minutes_ago": 37
+    },
+    {
+      "id": "2",
+      "camera_id": "31",
+      "name": "Simpang Tujuh",
+      "level": "macet",
+      "raised_minutes_ago": 80,
+      "acknowledged_by": "Ismail",
+      "acknowledged_minutes_ago": 60,
+      "note": "Ada perbaikan jalan"
+    },
+    {
+      "id": "3",
+      "camera_id": "30",
+      "name": "Simpang DPRD",
+      "level": "macet",
+      "raised_minutes_ago": 481,
+      "acknowledged_by": "Ismail",
+      "acknowledged_minutes_ago": 468,
+      "note": "Jam berangkat sekolah"
+    },
+    {
+      "id": "4",
+      "camera_id": "33",
+      "name": "Simpang Bae",
+      "level": "macet",
+      "raised_minutes_ago": 1412,
+      "acknowledged_by": "Rina",
+      "acknowledged_minutes_ago": 1390
+    }
+  ]
+}

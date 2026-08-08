@@ -129,6 +129,16 @@ class FakeFlowSenseApi implements FlowSenseApi {
   /// `failNext = 2` reproduces "two failures then recovery".
   int failNext = 0;
 
+  /// What [failNext] throws. Defaults to a 503, because "the server is having
+  /// a bad minute" is the ordinary case; set a 401 to reproduce an expired
+  /// session, which callers must treat completely differently.
+  ApiException failWith =
+      const ApiException('Fake sedang disetel untuk gagal', statusCode: 503);
+
+  /// How many times [snapshot] was called, failures included — so a test can
+  /// assert that polling actually *stopped* rather than merely erroring.
+  int snapshotCalls = 0;
+
   /// How many times [snapshot] has been served — the synthetic clock that
   /// advances the fixtures.
   int get tick => _tick;
@@ -137,8 +147,7 @@ class FakeFlowSenseApi implements FlowSenseApi {
   void _maybeFail() {
     if (failNext <= 0) return;
     failNext--;
-    throw const ApiException('Fake sedang disetel untuk gagal',
-        statusCode: 503);
+    throw failWith;
   }
 
   @override
@@ -149,6 +158,7 @@ class FakeFlowSenseApi implements FlowSenseApi {
 
   @override
   Future<TrafficSnapshot> snapshot() async {
+    snapshotCalls++;
     _maybeFail();
     final at = _now();
     final records = <TrafficRecord>[];

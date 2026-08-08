@@ -40,10 +40,18 @@ final class RepoData extends RepoState {
 /// A poll failed. [lastGood] is whatever was on screen before, so the UI keeps
 /// rendering it under a staleness banner instead of blanking.
 final class RepoError extends RepoState {
-  const RepoError({required this.message, this.lastGood});
+  const RepoError({required this.message, this.lastGood, this.statusCode});
 
   final String message;
   final TrafficSnapshot? lastGood;
+
+  /// The HTTP status behind the failure, when there was one.
+  ///
+  /// Carried through because not every failure means the same thing to the
+  /// caller: a 503 is worth retrying and a **401 is not**. The operator
+  /// console reads this to end the session instead of polling forever against
+  /// a token the server has already rejected.
+  final int? statusCode;
 }
 
 /// Polls [FlowSenseApi] on a cadence and narrates the result as [RepoState].
@@ -129,7 +137,11 @@ class TrafficRepository {
       ));
     } on ApiException catch (e) {
       if (_disposed) return;
-      _emit(RepoError(message: e.message, lastGood: _lastGood));
+      _emit(RepoError(
+        message: e.message,
+        lastGood: _lastGood,
+        statusCode: e.statusCode,
+      ));
     }
   }
 
