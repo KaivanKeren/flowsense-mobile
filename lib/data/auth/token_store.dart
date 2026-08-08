@@ -16,8 +16,10 @@ abstract class TokenStore {
 }
 
 class SecureTokenStore implements TokenStore {
-  /// v11 encrypts with AES-GCM and Keystore-wrapped keys out of the box, so
-  /// the defaults are already what this needs — no options to opt into.
+  /// The default constructor already encrypts with AES-GCM under a
+  /// Keystore-wrapped RSA key, so there is nothing to opt into here. Do not
+  /// "improve" this by reaching for `encryptedSharedPreferences` — see the
+  /// version pin in `pubspec.yaml` before touching this dependency at all.
   const SecureTokenStore({
     this._storage = const FlutterSecureStorage(),
   });
