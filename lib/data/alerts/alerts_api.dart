@@ -1,4 +1,9 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart' show rootBundle;
+
 import '../../core/api_exception.dart';
+import '../../domain/congestion.dart';
 import '../../domain/operator_alert.dart';
 
 /// Raised jams, and the record of who saw them.
@@ -29,6 +34,51 @@ class FakeAlertsApi implements AlertsApi {
   FakeAlertsApi({List<OperatorAlert> seed = const [], DateTime Function()? now})
       : _alerts = [...seed],
         _now = now ?? DateTime.now;
+
+  /// Parses `test/fixtures/alerts.json`.
+  ///
+  /// Offsets from now rather than absolute stamps, so a demo always opens on a
+  /// jam that started a plausible while ago instead of one from months back.
+  factory FakeAlertsApi.fromJson(String source, {DateTime Function()? now}) {
+    final clock = now ?? DateTime.now;
+    final at = clock();
+    final decoded = jsonDecode(source);
+    final entries = decoded is Map<String, dynamic> ? decoded['alerts'] : decoded;
+
+    DateTime? ago(Object? minutes) => minutes == null
+        ? null
+        : at.subtract(Duration(minutes: (minutes as num).toInt()));
+
+    return FakeAlertsApi(
+      now: clock,
+      seed: [
+        if (entries is List)
+          for (final e in entries)
+            if (e is Map<String, dynamic>)
+              OperatorAlert(
+                id: '${e['id'] ?? ''}',
+                cameraId: '${e['camera_id'] ?? ''}',
+                name: e['name'] as String? ?? '',
+                level: CongestionLevel.values.firstWhere(
+                  (l) => l.name == e['level'],
+                  orElse: () => CongestionLevel.macet,
+                ),
+                raisedAt: ago(e['raised_minutes_ago']) ?? at,
+                acknowledgedBy: e['acknowledged_by'] as String?,
+                acknowledgedAt: ago(e['acknowledged_minutes_ago']),
+                note: e['note'] as String?,
+              ),
+      ],
+    );
+  }
+
+  /// Loads the fixture out of the asset bundle — the path the running app
+  /// takes when no backend is configured.
+  static Future<FakeAlertsApi> fromFixtures({DateTime Function()? now}) async =>
+      FakeAlertsApi.fromJson(
+        await rootBundle.loadString('test/fixtures/alerts.json'),
+        now: now,
+      );
 
   final List<OperatorAlert> _alerts;
   final DateTime Function() _now;
