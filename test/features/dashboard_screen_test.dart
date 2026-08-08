@@ -12,6 +12,7 @@ import 'package:flowsense_mobile/domain/congestion.dart';
 import 'package:flowsense_mobile/domain/operator_alert.dart';
 import 'package:flowsense_mobile/features/common/status_pill.dart';
 import 'package:flowsense_mobile/features/operator/dashboard_screen.dart';
+import 'package:flowsense_mobile/features/operator/detail_screen.dart';
 import 'package:flowsense_mobile/state/alert_providers.dart';
 import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
@@ -374,6 +375,16 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('tapping a row opens that intersection', (tester) async {
+      await _pump(tester);
+
+      await tester.tap(find.byKey(const ValueKey('row-30')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DetailScreen), findsOneWidget);
+      expect(find.text('Per lajur'), findsOneWidget);
     });
 
     testWidgets('every row carries a status pill with words on it',

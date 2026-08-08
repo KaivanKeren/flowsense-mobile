@@ -40,7 +40,7 @@ Future<String?> _pumpChart(
             records: records,
             intersection: _simpang,
             end: _end,
-            minutes: minutes,
+            count: minutes,
             lane: selectedLane,
           ),
           lanes: _simpang.lanes,

@@ -82,6 +82,32 @@ final historyProvider = FutureProvider.family<List<TrafficRecord>, String>(
   },
 );
 
+/// How far back the operator detail chart looks, and at what resolution.
+///
+/// 96 buckets of 15 minutes. The layout spec rules out 5-minute buckets by
+/// name: 288 points across 360 px is a blur, not a chart.
+const kOperatorHistoryWindow = Duration(hours: 24);
+const kOperatorHistoryBucket = Duration(minutes: 15);
+const kOperatorHistoryBuckets = 96;
+
+/// A day of history for one intersection, aggregated **server side**.
+///
+/// The bucket is requested explicitly rather than left to the server's
+/// default, because the chart's x-axis is drawn against it — the two have to
+/// agree or the bars land in the wrong places.
+final operatorHistoryProvider =
+    FutureProvider.family<List<TrafficRecord>, String>(
+  (ref, cameraId) {
+    final now = ref.watch(clockProvider).now();
+    return ref.watch(apiProvider).history(
+          cameraId,
+          from: now.subtract(kOperatorHistoryWindow),
+          to: now,
+          bucket: '15m',
+        );
+  },
+);
+
 /// Overridden with a fake in tests, so no widget test touches a platform
 /// channel.
 final locationSourceProvider =

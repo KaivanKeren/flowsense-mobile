@@ -20,6 +20,7 @@ import '../common/failure_state.dart';
 import '../common/feed_view.dart';
 import '../common/stale_banner.dart';
 import '../common/status_pill.dart';
+import 'detail_screen.dart';
 
 /// One intersection as the operator list sees it.
 class IntersectionStatus {
@@ -524,7 +525,16 @@ class _IntersectionCard extends StatelessWidget {
         children: [
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0) Divider(height: 1, color: surfaces.roadLine),
-            _IntersectionRow(status: rows[i], now: now),
+            _IntersectionRow(
+              status: rows[i],
+              now: now,
+              onTap: () => unawaited(Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      DetailScreen(cameraId: rows[i].intersection.id),
+                ),
+              )),
+            ),
           ],
         ],
       ),
@@ -538,10 +548,15 @@ class _IntersectionCard extends StatelessWidget {
 /// This is what a wide desktop table becomes on a 360 px phone. Minimum height
 /// 56 so the touch target still clears 44 even when both lines are short.
 class _IntersectionRow extends StatelessWidget {
-  const _IntersectionRow({required this.status, required this.now});
+  const _IntersectionRow({
+    required this.status,
+    required this.now,
+    this.onTap,
+  });
 
   final IntersectionStatus status;
   final DateTime now;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -604,15 +619,19 @@ class _IntersectionRow extends StatelessWidget {
     );
 
     return Semantics(
+      button: onTap != null,
       label: '${status.intersection.name}, '
           '${statusLabel(status.level, isStale: status.isStale).toLowerCase()}, '
           '$facts',
       excludeSemantics: true,
-      child: status.isStale
-          // Dimmed, because a row you cannot trust should not compete with the
-          // rows you can.
-          ? Opacity(opacity: 0.6, child: row)
-          : row,
+      child: InkWell(
+        onTap: onTap,
+        child: status.isStale
+            // Dimmed, because a row you cannot trust should not compete with
+            // the rows you can.
+            ? Opacity(opacity: 0.6, child: row)
+            : row,
+      ),
     );
   }
 }

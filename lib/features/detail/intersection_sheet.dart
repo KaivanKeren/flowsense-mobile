@@ -388,9 +388,19 @@ class _LaneRow extends StatelessWidget {
                       Positioned.fill(
                         child: ColoredBox(color: surfaces.roadLine),
                       ),
-                      FractionallySizedBox(
-                        widthFactor: ratio,
-                        child: ColoredBox(color: color),
+                      // `heightFactor: 1` is load bearing: without it the
+                      // child gets loose vertical constraints and the
+                      // `ColoredBox` collapses to zero height, leaving an
+                      // empty track while every text assertion still passes.
+                      Positioned.fill(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: ratio,
+                            heightFactor: 1,
+                            child: ColoredBox(color: color),
+                          ),
+                        ),
                       ),
                     ],
                   ),
