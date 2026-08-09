@@ -17,6 +17,7 @@ import '../state/alert_providers.dart';
 import '../state/auth_providers.dart';
 import '../state/health_providers.dart';
 import '../state/providers.dart';
+import '../state/theme_providers.dart';
 import 'theme.dart';
 
 /// The two audiences, from one codebase.
@@ -135,23 +136,33 @@ Future<void> bootstrap(Flavor flavor) async {
 
 /// The shared app shell. Everything flavor-specific arrives through [flavor];
 /// there is no second `MaterialApp`.
-class FlowSenseApp extends StatelessWidget {
+class FlowSenseApp extends ConsumerWidget {
   const FlowSenseApp({super.key, required this.flavor});
 
   final Flavor flavor;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: flavor.appTitle,
-        theme: flowSenseTheme(),
-        // Warga is light-only, by decision rather than omission: the layout
-        // spec files dark mode under "deliberately not built" — it scores
-        // nothing and doubles the contrast checking. Operator has no such
-        // spec and keeps following the system.
-        darkTheme: flavor == Flavor.warga
-            ? null
-            : flowSenseTheme(brightness: Brightness.dark),
-        themeMode: flavor == Flavor.warga ? ThemeMode.light : ThemeMode.system,
-        home: homeFor(flavor),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Warga is light-only, by decision rather than omission: the citizen
+    // layout spec files dark mode under "deliberately not built" — it scores
+    // nothing and doubles the contrast checking.
+    //
+    // Operator follows the refinement spec §12, which names a dark
+    // operational theme as primary. The user's saved preference wins if they
+    // set one; otherwise `themeModeProvider` defaults to dark.
+    final themeMode = switch (flavor) {
+      Flavor.warga => ThemeMode.light,
+      Flavor.operator => ref.watch(themeModeProvider),
+    };
+
+    return MaterialApp(
+      title: flavor.appTitle,
+      theme: flowSenseTheme(),
+      darkTheme: flavor == Flavor.warga
+          ? null
+          : flowSenseTheme(brightness: Brightness.dark),
+      themeMode: themeMode,
+      home: homeFor(flavor),
+    );
+  }
 }

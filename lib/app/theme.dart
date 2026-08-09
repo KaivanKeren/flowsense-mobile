@@ -18,13 +18,57 @@ abstract final class FlowRadius {
   static const double sheet = 16;
 }
 
-/// The type scale. Five sizes, and **nothing below 11**.
+/// The spacing scale. Six sizes and nothing between — the refinement spec
+/// §4 asks for consistent rhythm, and picking a value not on this list is
+/// how a layout starts drifting.
+///
+/// Migration is deliberate: existing widgets keep their hardcoded EdgeInsets
+/// until each screen's redesign pass touches them. This class exists so new
+/// code has somewhere to reach, not to force a repo-wide rename.
+abstract final class FlowSpace {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 24;
+  static const double xxl = 32;
+}
+
+/// The type scale, expanded in Fase 2 of the refinement pass to hit
+/// spec §14 (body 14–16, page title 22–24, KPI 28–32).
+///
+/// Rules that survived: **nothing below 11**, one type family, only two
+/// weights. Nothing new can be added without an entry here.
 abstract final class FlowTextSize {
-  /// The one big number — vehicle counts in the sheet.
+  /// The hero KPI, when a card wants the number to carry the screen.
+  /// Spec §15 recommends 28–32; use this for the primary figure on
+  /// operational cards (dashboard hero, alert count).
+  static const double figureLarge = 32;
+
+  /// The everyday big number — vehicle counts in the sheet, KPI on
+  /// secondary cards.
   static const double figure = 28;
-  static const double screenTitle = 18;
+
+  /// The page's own title. Spec §14 recommends 22–24.
+  static const double pageTitle = 24;
+
+  /// A section heading inside a screen. Was 18 pre-fase-2 — the spec
+  /// pulls it up.
+  static const double screenTitle = 22;
+
+  /// The title of a row in a list, or a card's own name. Left alone;
+  /// spec's "card title 14–16" would deflate row density more than
+  /// it would clarify.
   static const double rowTitle = 15;
-  static const double body = 13;
+
+  /// Prominent body — the paragraph a user is meant to actually read.
+  /// Spec §14: "do not shrink body text excessively to fit more data."
+  static const double bodyLarge = 16;
+
+  /// Everyday body. Was 13 pre-fase-2 — the spec floor is 14.
+  static const double body = 14;
+
+  /// Metadata, timestamps, unit labels. The floor.
   static const double caption = 11;
 }
 
@@ -73,6 +117,34 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
     errorPill: PillColors(tint: Color(0xFFF6E5E4), ink: Color(0xFFB3261E)),
   );
 
+  /// Dark operational palette, from refinement spec §12: deep navy background,
+  /// elevated slate surfaces, high-contrast text, restrained accents. Not
+  /// pure black — pure black on OLED reads as a hole, and every hairline has
+  /// to fight for visibility. The card sits one step above the page so a
+  /// stacked card reads as a card, and `roadLine` is bright enough to render
+  /// on it.
+  ///
+  /// Text tokens are held to the same 4.5:1 floor as [light]. Measured against
+  /// [page] (relative luminance 0.007): `textPrimary` ≈ 15.4:1, `textSecondary`
+  /// ≈ 8.2:1, `textFaint` ≈ 5.8:1. `faintInk` stays below the floor on purpose
+  /// — it is only for non-text glyphs (drag handles, inactive icons), matching
+  /// the same carve-out light mode makes.
+  ///
+  /// Warga is not affected by this palette: `flavor.dart` pins it to
+  /// `ThemeMode.light`. The refinement spec targets the operator console.
+  static const dark = FlowSurfaces(
+    page: Color(0xFF0E1420),
+    card: Color(0xFF172033),
+    map: Color(0xFF0A0F19),
+    roadLine: Color(0xFF29334A),
+    textPrimary: Color(0xFFE6EAF2),
+    textSecondary: Color(0xFFA6B0C4),
+    textFaint: Color(0xFF8791A6),
+    faintInk: Color(0xFF6B7691),
+    errorInk: Color(0xFFF3A19E),
+    errorPill: PillColors(tint: Color(0xFF3A1F1E), ink: Color(0xFFF3A19E)),
+  );
+
   /// Page background.
   final Color page;
 
@@ -114,8 +186,14 @@ class FlowSurfaces extends ThemeExtension<FlowSurfaces> {
   /// this one non-congestion red; the word is what distinguishes them.
   final PillColors errorPill;
 
-  static FlowSurfaces of(BuildContext context) =>
-      Theme.of(context).extension<FlowSurfaces>() ?? light;
+  /// Looks the extension up, falling back to the palette that matches the
+  /// ambient brightness — a widget rendered outside `flowSenseTheme` still
+  /// gets tokens whose contrast is roughly right for its background.
+  static FlowSurfaces of(BuildContext context) {
+    final extension = Theme.of(context).extension<FlowSurfaces>();
+    if (extension != null) return extension;
+    return Theme.of(context).brightness == Brightness.dark ? dark : light;
+  }
 
   @override
   FlowSurfaces copyWith({
@@ -287,6 +365,105 @@ class CongestionColors extends ThemeExtension<CongestionColors> {
   }
 }
 
+/// The refinement-spec semantic slots that are **not** congestion
+/// (spec §11): AI prediction, emergency, and information.
+///
+/// Kept in its own extension rather than folded into [FlowSurfaces] because
+/// the rule these hues live under is different — [FlowSurfaces] is chrome and
+/// text, [CongestionColors] means traffic and *only* traffic, and this
+/// extension exists so alerts, AI recommendations, and non-traffic info can
+/// have colour without borrowing the congestion palette. A widget that mixes
+/// them gets three shades of red side-by-side and a viewer who cannot tell an
+/// emergency vehicle from a jam.
+///
+/// - [prediction] — purple. AI forecast, projected queue, recommendation.
+/// - [emergency]  — a red distinct from `macet`. Emergency vehicle, gridlock
+///                  risk, intersection failure. Different hue on purpose so
+///                  it cannot be read as "the road is red".
+/// - [info]       — cyan. System status, hint, neutral notice.
+@immutable
+class FlowSemantics extends ThemeExtension<FlowSemantics> {
+  const FlowSemantics({
+    required this.prediction,
+    required this.predictionPill,
+    required this.emergency,
+    required this.emergencyPill,
+    required this.info,
+    required this.infoPill,
+  });
+
+  /// All pill inks pass 4.5:1 on their tint; every base colour passes 4.5:1
+  /// as text on [FlowSurfaces.light.page].
+  static const light = FlowSemantics(
+    prediction: Color(0xFF5A3FCC),
+    predictionPill: PillColors(tint: Color(0xFFEBE7FA), ink: Color(0xFF4632A6)),
+    emergency: Color(0xFFC1281F),
+    emergencyPill: PillColors(tint: Color(0xFFFADEDA), ink: Color(0xFF8F1B14)),
+    info: Color(0xFF1568B8),
+    infoPill: PillColors(tint: Color(0xFFDFEDFA), ink: Color(0xFF0F4C87)),
+  );
+
+  /// Dark counterparts. Base colours are lighter for legibility on the dark
+  /// page; pill tints are dark, pill inks light — the inverse of the light
+  /// pill, same contrast budget.
+  static const dark = FlowSemantics(
+    prediction: Color(0xFFA28BF7),
+    predictionPill: PillColors(tint: Color(0xFF241B4A), ink: Color(0xFFC4B3FF)),
+    emergency: Color(0xFFFF6E68),
+    emergencyPill: PillColors(tint: Color(0xFF4A1815), ink: Color(0xFFFFB1AC)),
+    info: Color(0xFF5FB0F5),
+    infoPill: PillColors(tint: Color(0xFF10304F), ink: Color(0xFFA5D2F8)),
+  );
+
+  final Color prediction;
+  final PillColors predictionPill;
+
+  /// Not `macet`. This is a different hue and reserved for events that mean
+  /// *danger*, not congestion.
+  final Color emergency;
+  final PillColors emergencyPill;
+
+  final Color info;
+  final PillColors infoPill;
+
+  static FlowSemantics of(BuildContext context) {
+    final extension = Theme.of(context).extension<FlowSemantics>();
+    if (extension != null) return extension;
+    return Theme.of(context).brightness == Brightness.dark ? dark : light;
+  }
+
+  @override
+  FlowSemantics copyWith({
+    Color? prediction,
+    PillColors? predictionPill,
+    Color? emergency,
+    PillColors? emergencyPill,
+    Color? info,
+    PillColors? infoPill,
+  }) =>
+      FlowSemantics(
+        prediction: prediction ?? this.prediction,
+        predictionPill: predictionPill ?? this.predictionPill,
+        emergency: emergency ?? this.emergency,
+        emergencyPill: emergencyPill ?? this.emergencyPill,
+        info: info ?? this.info,
+        infoPill: infoPill ?? this.infoPill,
+      );
+
+  @override
+  FlowSemantics lerp(ThemeExtension<FlowSemantics>? other, double t) {
+    if (other is! FlowSemantics) return this;
+    return FlowSemantics(
+      prediction: Color.lerp(prediction, other.prediction, t)!,
+      predictionPill: t < 0.5 ? predictionPill : other.predictionPill,
+      emergency: Color.lerp(emergency, other.emergency, t)!,
+      emergencyPill: t < 0.5 ? emergencyPill : other.emergencyPill,
+      info: Color.lerp(info, other.info, t)!,
+      infoPill: t < 0.5 ? infoPill : other.infoPill,
+    );
+  }
+}
+
 /// What the status pill says.
 ///
 /// Staleness outranks the level, and deliberately so: a `macet` reading from
@@ -321,20 +498,28 @@ TextTheme _textTheme(FlowSurfaces surfaces) {
   final secondary = surfaces.textSecondary;
 
   return TextTheme(
-    // 28 — the one big number.
-    displayLarge: style(FlowTextSize.figure, _medium, primary),
-    displayMedium: style(FlowTextSize.figure, _medium, primary),
+    // 32 — the hero KPI. Reserved for the biggest number on the screen.
+    displayLarge: style(FlowTextSize.figureLarge, _medium, primary),
+    displayMedium: style(FlowTextSize.figureLarge, _medium, primary),
+    // 28 — the everyday big number (sheet counts, secondary KPI).
     displaySmall: style(FlowTextSize.figure, _medium, primary),
     headlineLarge: style(FlowTextSize.figure, _medium, primary),
     headlineMedium: style(FlowTextSize.figure, _medium, primary),
-    // 18 — screen titles.
+    // 22 — a section heading inside a screen. Migrate to this instead of
+    // hand-rolling a 22-px style; `titleMedium` stays a row title.
     headlineSmall: style(FlowTextSize.screenTitle, _medium, primary),
-    titleLarge: style(FlowTextSize.screenTitle, _medium, primary),
-    // 15 — row titles.
+    // 24 — the page's own title (app bar, sheet header).
+    titleLarge: style(FlowTextSize.pageTitle, _medium, primary),
+    // 15 — row / card titles. Kept at rowTitle rather than promoted to the
+    // spec's section-title size: many list rows across the app use this slot,
+    // and inflating it would collapse density before the redesign pass gets
+    // to reconsider each layout. Screens that want a section header should
+    // reach for `headlineSmall`.
     titleMedium: style(FlowTextSize.rowTitle, _medium, primary),
     titleSmall: style(FlowTextSize.rowTitle, _medium, primary),
-    // 13 — body.
-    bodyLarge: style(FlowTextSize.body, _regular, primary),
+    // 16 — prominent body (paragraphs the user actually reads).
+    bodyLarge: style(FlowTextSize.bodyLarge, _regular, primary),
+    // 14 — everyday body. Was 13 pre-fase-2 — spec floor is 14.
     bodyMedium: style(FlowTextSize.body, _regular, primary),
     labelLarge: style(FlowTextSize.body, _medium, primary),
     labelMedium: style(FlowTextSize.body, _regular, secondary),
@@ -350,35 +535,34 @@ const _seed = Color(0xFF1565C0);
 
 ThemeData flowSenseTheme({Brightness brightness = Brightness.light}) {
   final isDark = brightness == Brightness.dark;
-  final surfaces = FlowSurfaces.light;
+  final surfaces = isDark ? FlowSurfaces.dark : FlowSurfaces.light;
   final congestion = isDark ? CongestionColors.dark : CongestionColors.light;
+  final semantics = isDark ? FlowSemantics.dark : FlowSemantics.light;
 
   final scheme = ColorScheme.fromSeed(
     seedColor: _seed,
     brightness: brightness,
   ).copyWith(
-    surface: isDark ? null : surfaces.page,
-    onSurface: isDark ? null : surfaces.textPrimary,
-    onSurfaceVariant: isDark ? null : surfaces.textSecondary,
-    outlineVariant: isDark ? null : surfaces.roadLine,
+    surface: surfaces.page,
+    onSurface: surfaces.textPrimary,
+    onSurfaceVariant: surfaces.textSecondary,
+    outlineVariant: surfaces.roadLine,
   );
 
-  final text = isDark
-      ? ThemeData(brightness: Brightness.dark).textTheme
-      : _textTheme(surfaces);
+  final text = _textTheme(surfaces);
 
   final base = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    fontFamily: isDark ? null : kFontFamily,
+    fontFamily: kFontFamily,
     textTheme: text,
-    scaffoldBackgroundColor: isDark ? null : surfaces.page,
-    extensions: [congestion, surfaces],
+    scaffoldBackgroundColor: surfaces.page,
+    extensions: [congestion, surfaces, semantics],
   );
 
-  if (isDark) return base;
-
   // Flat and clean: no gradients, no shadows, no glass. Hairline borders only.
+  // Applied identically to both brightnesses — the tokens carry the light/dark
+  // difference, the widget theming does not need to branch.
   return base.copyWith(
     dividerTheme: DividerThemeData(
       color: surfaces.roadLine,

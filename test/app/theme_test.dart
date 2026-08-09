@@ -50,21 +50,30 @@ void main() {
       expect(FlowRadius.sheet, 16);
     });
 
-    test('the type scale is the five permitted sizes, nothing below 11', () {
+    test('the type scale is the permitted sizes, nothing below 11', () {
+      // Fase 2 of the refinement pass grew the scale from five to seven to hit
+      // spec §14 (body 14–16, page title 22–24, KPI 28–32). The "nothing
+      // below 11" rule and the exhaustive-slot check are what has to hold.
       const sizes = [
+        FlowTextSize.figureLarge,
         FlowTextSize.figure,
+        FlowTextSize.pageTitle,
         FlowTextSize.screenTitle,
         FlowTextSize.rowTitle,
+        FlowTextSize.bodyLarge,
         FlowTextSize.body,
         FlowTextSize.caption,
       ];
-      expect(sizes, [28.0, 18.0, 15.0, 13.0, 11.0]);
+      expect(sizes, [32.0, 28.0, 24.0, 22.0, 15.0, 16.0, 14.0, 11.0]);
 
       final text = flowSenseTheme().textTheme;
       for (final style in [
+        text.displayLarge,
         text.displaySmall,
+        text.headlineSmall,
         text.titleLarge,
         text.titleMedium,
+        text.bodyLarge,
         text.bodyMedium,
         text.bodySmall,
         text.labelSmall,

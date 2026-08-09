@@ -122,19 +122,28 @@ Future<void> _pump(
 /// Brings a filter chip into view.
 ///
 /// The spec makes this row "satu baris chip yang bisa digeser mendatar", so at
-/// 360 px the third chip genuinely starts off-screen — scrolling to it is the
-/// intended interaction, not a workaround.
+/// 360 px the trailing chips genuinely start off-screen — scrolling to them is
+/// the intended interaction, not a workaround. Post fase-2 typography (body
+/// 13→14), the second chip is also partially off-screen, so every chip except
+/// the first now needs to be revealed before it can be tapped.
+///
+/// Drags the horizontal scrollable directly rather than relying on
+/// `ensureVisible` (which errors when a ListView child's element is not
+/// currently mounted) or `scrollUntilVisible` (which stops as soon as the
+/// widget's element exists, even when its RenderObject is off-screen).
 Future<void> _revealChip(WidgetTester tester, String key) async {
-  await tester.scrollUntilVisible(
-    find.byKey(ValueKey(key)),
-    120,
-    scrollable: find.descendant(
-      of: find.byType(PeringatanScreen),
-      matching: find.byWidgetPredicate(
-        (w) => w is Scrollable && w.axisDirection == AxisDirection.right,
-      ),
+  final scrollable = find.descendant(
+    of: find.byType(PeringatanScreen),
+    matching: find.byWidgetPredicate(
+      (w) => w is Scrollable && w.axisDirection == AxisDirection.right,
     ),
   );
+  await tester.dragUntilVisible(
+    find.byKey(ValueKey(key)),
+    scrollable,
+    const Offset(-100, 0),
+  );
+  await tester.pumpAndSettle();
 }
 
 List<String> _cards(WidgetTester tester) => find
@@ -218,6 +227,7 @@ void main() {
     testWidgets('choosing an intersection narrows the list', (tester) async {
       await _pump(tester);
 
+      await _revealChip(tester, 'filter-camera');
       await tester.tap(find.byKey(const ValueKey('filter-camera')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Simpang Tujuh').last);
