@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 
-/// One pattern, three variants. Every variant is a single sentence saying what
-/// happened and a single button that does something about it.
+/// One pattern, several variants. Every variant is a single sentence saying
+/// what happened, and — when there is one — a single button that does
+/// something about it. The button is optional: an empty result is not a
+/// failure to retry, so a `noAlerts` state has none.
 ///
 /// **There is no endless spinner in this app.** A spinner says "wait" without
 /// saying what for, and on a phone at a junction that is worse than saying
@@ -12,10 +14,13 @@ class FailureState extends StatelessWidget {
   const FailureState({
     super.key,
     required this.message,
-    required this.actionLabel,
-    required this.onAction,
+    this.actionLabel,
+    this.onAction,
     this.icon = Icons.cloud_off_outlined,
-  });
+  }) : assert(
+          (actionLabel == null) == (onAction == null),
+          'actionLabel and onAction must be both set or both omitted',
+        );
 
   /// No connection — the last snapshot is usually still on screen behind this.
   const FailureState.noConnection({
@@ -43,9 +48,18 @@ class FailureState extends StatelessWidget {
         onAction = onOpenList,
         icon = Icons.location_off_outlined;
 
+  /// The alert history is empty for the current filter. Deliberately actionless
+  /// — an operator changes the filter chips if they want to see more, and a
+  /// "Coba lagi" button here would promise something that isn't happening.
+  const FailureState.noAlerts({super.key})
+      : message = 'Tidak ada peringatan pada rentang ini.',
+        actionLabel = null,
+        onAction = null,
+        icon = Icons.notifications_none_outlined;
+
   final String message;
-  final String actionLabel;
-  final VoidCallback onAction;
+  final String? actionLabel;
+  final VoidCallback? onAction;
   final IconData icon;
 
   @override
@@ -64,8 +78,10 @@ class FailureState extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
-            OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
+            if (actionLabel != null) ...[
+              const SizedBox(height: 20),
+              OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
+            ],
           ],
         ),
       ),

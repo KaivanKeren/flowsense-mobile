@@ -18,6 +18,7 @@ import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../common/failure_state.dart';
 import '../common/feed_view.dart';
+import '../common/freshness_stamp.dart';
 import '../common/stale_banner.dart';
 import '../common/status_pill.dart';
 import 'detail_screen.dart';
@@ -126,9 +127,11 @@ IntersectionStatus _statusFor(
 /// The operator console's home.
 ///
 /// Order is the argument, and it is the reverse of what a desktop dashboard
-/// would do: the summary, then **active alerts**, then the intersection list.
-/// On a phone what needs action has to be visible before what needs watching,
-/// so alerts sit above the list rather than beside it.
+/// would do: a freshness stamp, then **active alerts**, then the summary, then
+/// the intersection list. On a phone what needs action has to be visible before
+/// what needs watching (spec §10), so alerts sit above the summary — the
+/// summary is a scoreboard, the alerts are the reason a person opens this
+/// screen. The freshness stamp anchors everything else against a known "as of".
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -215,15 +218,28 @@ class _Body extends ConsumerWidget {
         if (banner != null) StaleBanner(message: banner, onRetry: retry),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
+              // Freshness comes before anything else so the operator reads the
+              // rest of the page against a known "as of" — spec §21.
+              Align(
+                alignment: Alignment.centerRight,
+                child: FreshnessStamp(
+                  age: _newestAge(snapshot, now),
+                  level: _freshnessLevel(snapshot, now, config.staleAfter),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Alerts before summary: spec §10 puts what needs action above
+              // what needs watching. The summary is a scoreboard; the alerts
+              // are the reason a person opens this screen.
+              const _AlertsSection(),
+              const SizedBox(height: 24),
               _SummaryCard(
                 summary: summarise([
                   for (final r in rows) (level: r.level, isStale: r.isStale),
                 ]),
               ),
-              const SizedBox(height: 24),
-              const _AlertsSection(),
               const SizedBox(height: 24),
               _SectionHeader(
                 title: 'Simpang',
@@ -246,6 +262,29 @@ class _Body extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// How long ago the freshest record in [snapshot] was captured. Falls back to
+/// [TrafficSnapshot.fetchedAt] when there are no records at all — the empty
+/// case is handled upstream but the helper stays defensive.
+Duration _newestAge(TrafficSnapshot snapshot, DateTime now) {
+  final newest = snapshot.records.isEmpty
+      ? snapshot.fetchedAt
+      : snapshot.records
+          .map((r) => r.ts)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+  return now.difference(newest);
+}
+
+FreshnessLevel _freshnessLevel(
+  TrafficSnapshot snapshot,
+  DateTime now,
+  Duration staleAfter,
+) {
+  final age = _newestAge(snapshot, now);
+  if (age >= staleAfter * 2) return FreshnessLevel.offline;
+  if (age >= staleAfter) return FreshnessLevel.stale;
+  return FreshnessLevel.fresh;
 }
 
 /// Four numbers in a row: macet, padat, lancar, tanpa data.

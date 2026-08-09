@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme.dart';
 import '../../core/max_width.dart';
 import '../../domain/alert_filter.dart';
+import '../../domain/congestion.dart';
 import '../../domain/operator_alert.dart';
 import '../../state/alert_providers.dart';
 import '../../state/providers.dart';
+import '../common/failure_state.dart';
 
 /// The alert record.
 ///
@@ -27,7 +29,6 @@ class _PeringatanScreenState extends ConsumerState<PeringatanScreen> {
   @override
   Widget build(BuildContext context) {
     final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
     final now = ref.watch(clockProvider).now();
     final alerts = ref.watch(operatorAlertsProvider);
     final intersections = ref.watch(intersectionsProvider).valueOrNull ?? [];
@@ -50,26 +51,10 @@ class _PeringatanScreenState extends ConsumerState<PeringatanScreen> {
               child: switch (alerts) {
                 AsyncLoading() =>
                   const Center(child: CircularProgressIndicator()),
-                AsyncError() => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Riwayat peringatan tidak dapat dimuat.',
-                            textAlign: TextAlign.center,
-                            style: text.bodyMedium,
-                          ),
-                          const SizedBox(height: 16),
-                          OutlinedButton(
-                            onPressed: () =>
-                                ref.invalidate(operatorAlertsProvider),
-                            child: const Text('Coba lagi'),
-                          ),
-                        ],
-                      ),
-                    ),
+                AsyncError() => FailureState(
+                    message: 'Riwayat peringatan tidak dapat dimuat.',
+                    actionLabel: 'Coba lagi',
+                    onAction: () => ref.invalidate(operatorAlertsProvider),
                   ),
                 AsyncData(:final value) => _AlertList(
                     alerts: applyAlertFilter(value, _filter, now),
@@ -93,18 +78,7 @@ class _AlertList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (alerts.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Tidak ada peringatan pada rentang ini.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-      );
-    }
+    if (alerts.isEmpty) return const FailureState.noAlerts();
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -128,45 +102,86 @@ class _AlertCard extends StatelessWidget {
     final surfaces = FlowSurfaces.of(context);
     final text = Theme.of(context).textTheme;
     final summary = alertSummaryLine(alert, now);
+    final accent = _accentColor(context, alert.level);
+
+    // A tier-coloured left rail signals severity without borrowing the full
+    // congestion palette (spec §27) — the rail is 3 px, the rest of the
+    // border stays the hairline so the row still reads as a card first and a
+    // severity marker second. An acknowledged alert loses the rail: the
+    // accent belongs to what still needs a person.
+    //
+    // The rail is inside a `ClipRRect` rather than the border itself because
+    // Flutter's `Border` refuses non-uniform colours together with a
+    // `borderRadius` — the paint call would throw.
+    final showRail = !alert.isAcknowledged;
 
     return Semantics(
       label: '${shortDateTime(alert.raisedAt)}, ${alert.name}, '
           '${alert.isAcknowledged ? 'diakui' : 'belum diakui'}, $summary',
       excludeSemantics: true,
-      child: Container(
+      child: DecoratedBox(
         key: ValueKey('alert-${alert.id}'),
         decoration: BoxDecoration(
           color: surfaces.card,
           borderRadius: BorderRadius.circular(FlowRadius.card),
           border: Border.all(color: surfaces.roadLine),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(FlowRadius.card),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (showRail) Container(width: 3, color: accent),
                 Expanded(
-                  child: Text(
-                    shortDateTime(alert.raisedAt),
-                    style: text.bodySmall
-                        ?.copyWith(color: surfaces.textSecondary),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                shortDateTime(alert.raisedAt),
+                                style: text.bodySmall
+                                    ?.copyWith(color: surfaces.textSecondary),
+                              ),
+                            ),
+                            _AckPill(isAcknowledged: alert.isAcknowledged),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(alert.name, style: text.titleMedium),
+                        const SizedBox(height: 2),
+                        Text(
+                          summary,
+                          style: text.bodySmall
+                              ?.copyWith(color: surfaces.textSecondary),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                _AckPill(isAcknowledged: alert.isAcknowledged),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(alert.name, style: text.titleMedium),
-            const SizedBox(height: 2),
-            Text(
-              summary,
-              style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Left-rail colour by alert level. `macet` uses the semantic emergency red
+  /// rather than the congestion `macet` — this rail is severity signalling,
+  /// not a congestion state, and using two different reds side by side is
+  /// what the palette rules are there to prevent.
+  Color _accentColor(BuildContext context, CongestionLevel level) {
+    return switch (level) {
+      CongestionLevel.macet => FlowSemantics.of(context).emergency,
+      CongestionLevel.padat => CongestionColors.of(context).padat,
+      _ => FlowSurfaces.of(context).roadLine,
+    };
   }
 }
 
