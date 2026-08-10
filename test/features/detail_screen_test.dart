@@ -280,6 +280,11 @@ void main() {
         (tester) async {
       await _pump(tester);
 
+      // The 24-hour section sits below the AI recommendation, camera and
+      // per-lane sections — on a 360×800 test viewport the chart starts
+      // beyond the fold, so scroll it into view before tapping.
+      await tester.ensureVisible(find.byKey(const ValueKey('history-bars')));
+      await tester.pumpAndSettle();
       final bars = find.descendant(
         of: find.byKey(const ValueKey('history-bars')),
         matching: find.byType(GestureDetector),
@@ -297,6 +302,8 @@ void main() {
         _record({'kota': 9, 'ploso': 1}, ts: _t0),
       ]);
 
+      await tester.ensureVisible(find.byKey(const ValueKey('history-bars')));
+      await tester.pumpAndSettle();
       final bars = find.descendant(
         of: find.byKey(const ValueKey('history-bars')),
         matching: find.byType(GestureDetector),

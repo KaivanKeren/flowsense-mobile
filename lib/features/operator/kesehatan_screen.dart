@@ -5,6 +5,8 @@ import '../../app/theme.dart';
 import '../../core/max_width.dart';
 import '../../domain/connector_health.dart';
 import '../../state/health_providers.dart';
+import '../common/failure_state.dart';
+import '../common/flow_card.dart';
 
 /// Are the connectors alive?
 ///
@@ -35,6 +37,13 @@ class KesehatanScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Modul AI sits above the connector list because the
+                    // refinement spec §26 puts AI service health at the top
+                    // of the system-health page: if the AI has failed, the
+                    // camera vitals below still add up but stop describing
+                    // what the system is actually doing.
+                    const _AiModelSection(),
+                    const SizedBox(height: 20),
                     Text('Kesehatan connector', style: text.titleLarge),
                     const SizedBox(height: 4),
                     Text(
@@ -51,18 +60,16 @@ class KesehatanScreen extends ConsumerWidget {
                 child: switch (health) {
                   AsyncLoading() =>
                     const Center(child: CircularProgressIndicator()),
-                  AsyncError() => _CouldNotLoad(
-                      onRetry: () => ref.invalidate(connectorHealthProvider),
+                  AsyncError() => FailureState(
+                      message: 'Status connector tidak dapat dimuat.',
+                      actionLabel: 'Coba lagi',
+                      onAction: () =>
+                          ref.invalidate(connectorHealthProvider),
                     ),
-                  AsyncData(:final value) when value.isEmpty => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Belum ada connector terdaftar.',
-                          style: text.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                  AsyncData(:final value) when value.isEmpty =>
+                    const FailureState(
+                      message: 'Belum ada connector terdaftar.',
+                      icon: Icons.sensors_off_outlined,
                     ),
                   AsyncData(:final value) => ListView.separated(
                       padding: EdgeInsets.zero,
@@ -83,32 +90,41 @@ class KesehatanScreen extends ConsumerWidget {
   }
 }
 
-class _CouldNotLoad extends StatelessWidget {
-  const _CouldNotLoad({required this.onRetry});
-
-  final VoidCallback onRetry;
+/// AI model health slot (spec §26 & §25).
+///
+/// Deliberately a placeholder: the health API surfaces only per-connector
+/// status right now (see [ConnectorHealth]), and inventing an AI confidence
+/// or latency here would fabricate a system-health signal — a screen an
+/// operator opens because "something feels wrong" cannot afford invented
+/// numbers. When the AI health endpoint lands this widget grows metrics
+/// (confidence average, inference latency, model version) inside the same
+/// [FlowCard.operational] shell.
+class _AiModelSection extends StatelessWidget {
+  const _AiModelSection();
 
   @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Status connector tidak dapat dimuat.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: onRetry,
-                child: const Text('Coba lagi'),
-              ),
-            ],
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+    final semantics = FlowSemantics.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return FlowCard.operational(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.auto_awesome_outlined,
+              size: 20, color: semantics.prediction),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Status Modul AI belum tersedia — menunggu integrasi backend.',
+              style: text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }
 
 /// Identity on the first line, vitals on the second.

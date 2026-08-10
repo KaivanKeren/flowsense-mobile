@@ -12,6 +12,7 @@ import '../../domain/lane_label.dart';
 import '../../domain/video_panel_state.dart';
 import '../../state/providers.dart';
 import '../common/feed_view.dart';
+import '../common/flow_card.dart';
 import '../common/stale_banner.dart';
 import '../common/status_pill.dart';
 import 'kalibrasi_screen.dart';
@@ -92,7 +93,12 @@ class DetailScreen extends ConsumerWidget {
                         isStale: stale,
                         now: now,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: _AiRecommendation(),
+                      ),
+                      const SizedBox(height: 20),
                       const _CameraPanel(),
                       const SizedBox(height: 20),
                       _Section(
@@ -129,6 +135,47 @@ class DetailScreen extends ConsumerWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// AI recommendation slot (spec §19–20).
+///
+/// Deliberately a placeholder: the operator console has no confidence,
+/// forecast, or recommendation field on [TrafficRecord] yet, and inventing
+/// numbers here would be worse than silence — a signal-timing tool must not
+/// pretend to have intelligence it does not have. The card is shipped in its
+/// "belum tersedia" state so the icon, colour, and slot in the vertical
+/// hierarchy are settled by the time the data source arrives.
+///
+/// Kept compact — a single line inside a [FlowCard.operational] — so the
+/// screen's other sections stay within the operator's first scroll. When the
+/// real recommendation lands it will expand vertically here.
+class _AiRecommendation extends StatelessWidget {
+  const _AiRecommendation();
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaces = FlowSurfaces.of(context);
+    final semantics = FlowSemantics.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return FlowCard.operational(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.auto_awesome_outlined,
+              size: 20, color: semantics.prediction),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Rekomendasi AI belum tersedia — modul menunggu integrasi '
+              'backend.',
+              style: text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+            ),
+          ),
+        ],
       ),
     );
   }

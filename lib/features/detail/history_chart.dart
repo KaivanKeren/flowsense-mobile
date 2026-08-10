@@ -256,7 +256,12 @@ class _AxisLabels extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (labels.length < 3) return const SizedBox.shrink();
-    final style = Theme.of(context).textTheme.bodySmall;
+    // bodyMedium (14) rather than bodySmall (11): the refinement spec §14
+    // pulls chart axis labels up to body, on the reasoning that they orient
+    // the reader against the chart itself and are not merely metadata.
+    // Widths ("16:00", "sekarang") are short enough that 14 clears 360 px
+    // comfortably.
+    final style = Theme.of(context).textTheme.bodyMedium;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
