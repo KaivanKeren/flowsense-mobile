@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/traffic_snapshot.dart';
 import '../../data/repository/traffic_repository.dart';
-import 'stale_banner.dart';
+import 'relative_time.dart';
 
 /// What a screen should render for one [RepoState], and what to say about it.
 ///
