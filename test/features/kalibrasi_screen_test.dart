@@ -8,8 +8,8 @@ import 'package:flowsense_mobile/data/calibration/calibration_api.dart';
 import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
 import 'package:flowsense_mobile/features/operator/kalibrasi_screen.dart';
+import 'package:flowsense_mobile/widgets/widgets.dart';
 import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/calibration_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
@@ -102,7 +102,7 @@ Finder _field(String lane) => find.descendant(
 
 Finder _pill(String lane) => find.descendant(
       of: find.byKey(ValueKey('capacity-$lane')),
-      matching: find.byType(StatusPill),
+      matching: find.byType(StatusChip),
     );
 
 void main() {
