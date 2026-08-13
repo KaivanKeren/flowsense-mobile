@@ -10,7 +10,7 @@ import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
 import 'package:flowsense_mobile/domain/congestion.dart';
 import 'package:flowsense_mobile/domain/operator_alert.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
+import 'package:flowsense_mobile/widgets/status_chip.dart';
 import 'package:flowsense_mobile/features/operator/dashboard_screen.dart';
 import 'package:flowsense_mobile/features/operator/detail_screen.dart';
 import 'package:flowsense_mobile/state/alert_providers.dart';
@@ -247,8 +247,10 @@ void main() {
       // watching.
       await _pump(tester, alerts: [_alert(id: '1', name: 'Simpang DPRD')]);
 
-      final alertY = tester.getTopLeft(find.text('Peringatan aktif')).dy;
-      final listY = tester.getTopLeft(find.text('Simpang')).dy;
+      // The console's section headings are set in monospace capitals, so the
+      // strings on screen are uppercase.
+      final alertY = tester.getTopLeft(find.text('PERINGATAN AKTIF')).dy;
+      final listY = tester.getTopLeft(find.text('SIMPANG')).dy;
       expect(alertY, lessThan(listY));
     });
 
@@ -399,8 +401,10 @@ void main() {
       await _pump(tester);
 
       // Never colour alone — red-green colour blindness is exactly the
-      // relevant case for a traffic console.
-      expect(find.byType(StatusPill), findsNWidgets(4));
+      // relevant case for a traffic console. `StatusChip` renders the word
+      // and, unless a caller turns it off, a glyph whose shape differs from
+      // every other status.
+      expect(find.byType(StatusChip), findsNWidgets(4));
     });
   });
 
