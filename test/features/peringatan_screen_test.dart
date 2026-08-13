@@ -135,6 +135,7 @@ Future<void> _revealChip(WidgetTester tester, String key) async {
       ),
     ),
   );
+  await tester.pumpAndSettle();
 }
 
 List<String> _cards(WidgetTester tester) => find

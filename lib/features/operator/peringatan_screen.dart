@@ -7,6 +7,7 @@ import '../../domain/alert_filter.dart';
 import '../../domain/operator_alert.dart';
 import '../../state/alert_providers.dart';
 import '../../state/providers.dart';
+import '../../widgets/widgets.dart';
 
 /// The alert record.
 ///
@@ -26,15 +27,17 @@ class _PeringatanScreenState extends ConsumerState<PeringatanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
     final now = ref.watch(clockProvider).now();
     final alerts = ref.watch(operatorAlertsProvider);
     final intersections = ref.watch(intersectionsProvider).valueOrNull ?? [];
 
     return Scaffold(
-      backgroundColor: surfaces.page,
-      appBar: AppBar(title: const Text('Peringatan')),
+      backgroundColor: colors.surfaceCanvas,
+      appBar: AppBar(
+        title: const Text('Peringatan'),
+        titleSpacing: FlowSpace.lg,
+      ),
       body: MaxWidth448(
         child: Column(
           key: const ValueKey('peringatan-body'),
@@ -48,28 +51,16 @@ class _PeringatanScreenState extends ConsumerState<PeringatanScreen> {
             ),
             Expanded(
               child: switch (alerts) {
-                AsyncLoading() =>
-                  const Center(child: CircularProgressIndicator()),
-                AsyncError() => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Riwayat peringatan tidak dapat dimuat.',
-                            textAlign: TextAlign.center,
-                            style: text.bodyMedium,
-                          ),
-                          const SizedBox(height: 16),
-                          OutlinedButton(
-                            onPressed: () =>
-                                ref.invalidate(operatorAlertsProvider),
-                            child: const Text('Coba lagi'),
-                          ),
-                        ],
-                      ),
-                    ),
+                // Loading. A skeleton in the shape of the alert rows, so the
+                // page says what is coming instead of merely asking for
+                // patience.
+                AsyncLoading() => const SkeletonList(rows: 5),
+                AsyncError() => MessageState.error(
+                    title: 'Tidak dapat memuat riwayat',
+                    message: 'Riwayat peringatan tidak dapat dimuat.',
+                    actionLabel: 'Coba lagi',
+                    onAction: () =>
+                        ref.invalidate(operatorAlertsProvider),
                   ),
                 AsyncData(:final value) => _AlertList(
                     alerts: applyAlertFilter(value, _filter, now),
@@ -94,23 +85,22 @@ class _AlertList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (alerts.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Tidak ada peringatan pada rentang ini.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
+      return MessageState.empty(
+        title: 'Tidak ada peringatan',
+        message: 'Tidak ada peringatan pada rentang ini.',
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      padding: const EdgeInsets.fromLTRB(
+        FlowSpace.lg,
+        FlowSpace.xs,
+        FlowSpace.lg,
+        FlowSpace.xl,
+      ),
       itemCount: alerts.length,
       itemBuilder: (context, i) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.only(bottom: FlowSpace.md),
         child: _AlertCard(alert: alerts[i], now: now),
       ),
     );
@@ -125,82 +115,42 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     final summary = alertSummaryLine(alert, now);
 
-    return Semantics(
-      label: '${shortDateTime(alert.raisedAt)}, ${alert.name}, '
+    return AppCard(
+      key: ValueKey('alert-${alert.id}'),
+      padding: const EdgeInsets.all(FlowSpace.md),
+      semanticsLabel: '${shortDateTime(alert.raisedAt)}, ${alert.name}, '
           '${alert.isAcknowledged ? 'diakui' : 'belum diakui'}, $summary',
-      excludeSemantics: true,
-      child: Container(
-        key: ValueKey('alert-${alert.id}'),
-        decoration: BoxDecoration(
-          color: surfaces.card,
-          borderRadius: BorderRadius.circular(FlowRadius.card),
-          border: Border.all(color: surfaces.roadLine),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    shortDateTime(alert.raisedAt),
-                    style: text.bodySmall
-                        ?.copyWith(color: surfaces.textSecondary),
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  shortDateTime(alert.raisedAt),
+                  style: type.caption,
                 ),
-                _AckPill(isAcknowledged: alert.isAcknowledged),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(alert.name, style: text.titleMedium),
-            const SizedBox(height: 2),
-            Text(
-              summary,
-              style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Whether a person has seen this one.
-///
-/// The unacknowledged state carries the attention colour, not the
-/// acknowledged one. The reference image has it the other way round — a green
-/// `Diakui` and a grey `Belum diakui` — which puts the emphasis on the rows
-/// that need nothing. Green is also spoken for by `Lancar`.
-class _AckPill extends StatelessWidget {
-  const _AckPill({required this.isAcknowledged});
-
-  final bool isAcknowledged;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final colors = CongestionColors.of(context);
-    final pill = isAcknowledged ? colors.unknownPill : surfaces.errorPill;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: pill.tint,
-        borderRadius: BorderRadius.circular(FlowRadius.control),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: Text(
-          isAcknowledged ? 'Diakui' : 'Belum diakui',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: pill.ink, fontWeight: FontWeight.w500),
-        ),
+              ),
+              // Never colour alone. A person glancing at the strip needs the
+              // word as much as the tint, which is exactly what StatusChip
+              // exists to guarantee.
+              StatusChip(
+                label: alert.isAcknowledged ? 'Diakui' : 'Belum diakui',
+                tone: alert.isAcknowledged
+                    ? StatusTone.neutral
+                    : StatusTone.emergency,
+                semanticsPrefix: null,
+              ),
+            ],
+          ),
+          const SizedBox(height: FlowSpace.sm),
+          Text(alert.name, style: type.sectionTitle),
+          const SizedBox(height: FlowSpace.xs),
+          Text(summary, style: type.caption),
+        ],
       ),
     );
   }
@@ -220,20 +170,25 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
 
     return SizedBox(
-      height: 60,
+      // The floor plus the row's own vertical padding. Anything less and the
+      // chips drop below the 48 dp target the rest of the console holds.
+      height: FlowTouch.minTarget + FlowSpace.lg,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: FlowSpace.lg,
+          vertical: FlowSpace.sm,
+        ),
         children: [
           _Chip(
             key: const ValueKey('filter-window'),
             label: filter.window.label,
             onTap: () => _pickWindow(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: FlowSpace.sm),
           _Chip(
             key: const ValueKey('filter-camera'),
             label: filter.cameraId == null
@@ -241,15 +196,15 @@ class _Filters extends StatelessWidget {
                 : intersections[filter.cameraId] ?? 'Simpang',
             onTap: () => _pickCamera(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: FlowSpace.sm),
           _Chip(
             key: const ValueKey('filter-ack'),
             label: filter.ack.label,
             onTap: () => _pickAck(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: FlowSpace.sm),
           // A hairline so the row reads as a strip rather than floating.
-          VerticalDivider(width: 1, color: surfaces.roadLine),
+          VerticalDivider(width: 1, color: colors.borderSubtle),
         ],
       ),
     );
@@ -302,11 +257,8 @@ class _Filters extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                padding: const EdgeInsets.all(FlowSpace.lg),
+                child: Text(title, style: FlowTypography.of(context).sectionTitle),
               ),
               for (final entry in options.entries)
                 ListTile(
@@ -327,20 +279,26 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: surfaces.card,
-          borderRadius: BorderRadius.circular(FlowRadius.control),
-          border: Border.all(color: surfaces.roadLine),
+      child: Semantics(
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: FlowTouch.minTarget),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: FlowSpace.md),
+          decoration: BoxDecoration(
+            color: colors.surfaceCard,
+            borderRadius: BorderRadius.circular(FlowRadius.sm),
+            border: Border.all(color: colors.borderSubtle),
+          ),
+          child: Text(label, style: type.body),
         ),
-        child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
       ),
     );
   }
