@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flowsense_mobile/app/flavor.dart';
+import 'package:flowsense_mobile/app/bootstrap.dart';
 import 'package:flowsense_mobile/core/api_exception.dart';
 import 'package:flowsense_mobile/core/clock.dart';
 import 'package:flowsense_mobile/core/config/app_config.dart';
@@ -8,6 +8,9 @@ import 'package:flowsense_mobile/core/max_width.dart';
 import 'package:flowsense_mobile/data/api/fake_flowsense_api.dart';
 import 'package:flowsense_mobile/data/auth/fake_auth_api.dart';
 import 'package:flowsense_mobile/data/auth/token_store.dart';
+import 'package:flowsense_mobile/data/prefs/app_mode_store.dart';
+import 'package:flowsense_mobile/domain/app_mode.dart';
+import 'package:flowsense_mobile/state/app_mode_providers.dart';
 import 'package:flowsense_mobile/features/operator/akun_screen.dart';
 import 'package:flowsense_mobile/features/operator/dashboard_screen.dart';
 import 'package:flowsense_mobile/features/operator/kesehatan_screen.dart';
@@ -51,12 +54,13 @@ Future<ProviderContainer> _pump(
     authApiProvider.overrideWithValue(authApi),
     tokenStoreProvider
         .overrideWithValue(store ?? FakeTokenStore(authApi.token)),
+    appModeStoreProvider.overrideWithValue(FakeAppModeStore(AppMode.operator)),
   ]);
   addTearDown(container.dispose);
 
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
-    child: home ?? const FlowSenseApp(flavor: Flavor.operator),
+    child: home ?? const FlowSenseApp(),
   ));
   await tester.pumpAndSettle();
   return container;

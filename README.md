@@ -1,8 +1,8 @@
 # FlowSense Mobile
 
-Two mobile frontends for the FlowSense traffic connector — **warga** (citizen
-traffic map) and **operator** (intersection dashboard) — as one Flutter
-codebase with two flavors.
+One mobile app for the FlowSense traffic connector, serving two audiences —
+**warga** (citizen traffic map) and **operator** (intersection dashboard) —
+switched at runtime from inside the app.
 
 > **The backend does not exist yet.** The connector plan ends at
 > `data/connector_<camera_id>.jsonl` on local disk; the HTTP service described
@@ -21,28 +21,39 @@ Requires Flutter 3.x / Dart 3.12+.
 
 ## Running
 
-| Flavor | Who it is for | Entry point | Home screen |
+One entry point, `lib/main.dart`, one APK, one icon:
+
+```bash
+flutter run \
+  --dart-define=FLOWSENSE_API_BASE=https://api.example.id \
+  --dart-define=FLOWSENSE_API_KEY=...
+```
+
+Release builds take the same `--dart-define` flags:
+
+```bash
+flutter build apk --dart-define=...
+```
+
+### The two modes
+
+| Mode | Who it is for | Home screen | How to get there |
 |---|---|---|---|
-| `warga` | Riders and drivers | `lib/main_warga.dart` | Map of every intersection, coloured by its worst approach, plus jam notifications |
-| `operator` | Traffic control staff | `lib/main_operator.dart` | Intersection list ranked worst-first, per-lane bars, one hour of history |
+| `warga` | Riders and drivers | Map of every intersection, coloured by its worst approach, plus jam notifications | Where the app opens; **Beralih ke tampilan warga** in the console's Akun tab |
+| `operator` | Traffic control staff | Intersection list ranked worst-first, per-lane bars, one hour of history | **Masuk sebagai operator** at the bottom of Langganan, then sign in |
 
-```bash
-flutter run --target=lib/main_warga.dart \
-  --dart-define=FLOWSENSE_API_BASE=https://api.example.id \
-  --dart-define=FLOWSENSE_API_KEY=...
+The choice is a runtime one — `AppMode`, held in `appModeProvider` and
+remembered on the device, so reopening the app lands where the last session
+left off. It is **not** an access control: pressing the button only chooses a
+shell, and `OperatorGate` still refuses to render the console without a
+session. Anyone who arrives at the login screen without an account has a
+`Kembali ke tampilan warga` button rather than a dead end.
 
-flutter run --target=lib/main_operator.dart \
-  --dart-define=FLOWSENSE_API_BASE=https://api.example.id \
-  --dart-define=FLOWSENSE_API_KEY=...
-```
+Jam notifications ride with `warga` only, by construction — the listener is
+part of the citizen shell, so an operator watching the console is not also
+being told to consider another route.
 
-Release builds take the same `--target` and `--dart-define` flags:
-
-```bash
-flutter build apk --target=lib/main_warga.dart --dart-define=...
-```
-
-Both flavors are **read-only**. Neither sends control commands, and there is no
+Both modes are **read-only**. Neither sends control commands, and there is no
 signal actuation from a phone — that is a safety question, not a feature
 question.
 
@@ -161,7 +172,7 @@ lib/
   features/   UI: shell, map, detail sheet, simpang, langganan, tentang,
               operator dashboard, alerts
   state/      Riverpod providers
-  app/        theme (every colour in the app), flavor, entry-point wiring
+  app/        theme (every colour in the app), bootstrap and entry-point wiring
 ```
 
 Three constraints hold the design together:

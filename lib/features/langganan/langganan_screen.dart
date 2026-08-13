@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme.dart';
 import '../../core/max_width.dart';
+import '../../domain/app_mode.dart';
 import '../../domain/subscription.dart';
+import '../../state/app_mode_providers.dart';
 import '../../state/providers.dart';
 import '../tentang/tentang_screen.dart';
 
@@ -94,6 +96,20 @@ class LanggananScreen extends ConsumerWidget {
                   builder: (_) => const TentangScreen(),
                 ),
               )),
+            ),
+
+            // The way into the console, and the only one — the citizen tabs
+            // carry no other mention of it. Down here rather than in the tab
+            // bar or an app bar: it is a door for the few people who work at
+            // the dinas, not a fourth destination for everyone else. Pressing
+            // it proves nothing; `OperatorGate` still asks for a password.
+            _LinkRow(
+              key: const ValueKey('switch-to-operator'),
+              label: 'Masuk sebagai operator',
+              icon: Icons.shield_outlined,
+              onTap: () => unawaited(
+                ref.read(appModeProvider.notifier).switchTo(AppMode.operator),
+              ),
             ),
           ],
         ),
@@ -325,16 +341,28 @@ class _AddRangeRow extends StatelessWidget {
 }
 
 class _LinkRow extends StatelessWidget {
-  const _LinkRow({required this.label, required this.onTap});
+  const _LinkRow({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
 
   final String label;
   final VoidCallback onTap;
+
+  /// A leading icon, for a row that goes somewhere unlike the others around it.
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => _Row(
         onTap: onTap,
         child: Row(
           children: [
+            if (icon != null) ...[
+              Icon(icon, size: 20),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child:
                   Text(label, style: Theme.of(context).textTheme.titleMedium),

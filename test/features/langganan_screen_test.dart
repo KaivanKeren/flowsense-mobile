@@ -3,10 +3,13 @@ import 'package:flowsense_mobile/data/api/flowsense_api.dart';
 import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
+import 'package:flowsense_mobile/data/prefs/app_mode_store.dart';
 import 'package:flowsense_mobile/data/prefs/subscription_store.dart';
+import 'package:flowsense_mobile/domain/app_mode.dart';
 import 'package:flowsense_mobile/domain/subscription.dart';
 import 'package:flowsense_mobile/features/langganan/langganan_screen.dart';
 import 'package:flowsense_mobile/features/tentang/tentang_screen.dart';
+import 'package:flowsense_mobile/state/app_mode_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,7 +59,10 @@ class _StubApi implements FlowSenseApi {
 Future<ProviderContainer> _pump(WidgetTester tester) async {
   late ProviderContainer container;
   await tester.pumpWidget(ProviderScope(
-    overrides: [apiProvider.overrideWithValue(_StubApi())],
+    overrides: [
+      apiProvider.overrideWithValue(_StubApi()),
+      appModeStoreProvider.overrideWithValue(FakeAppModeStore()),
+    ],
     child: MaterialApp(
       theme: flowSenseTheme(),
       home: Consumer(builder: (context, ref, _) {
@@ -164,6 +170,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TentangScreen), findsOneWidget);
+  });
+
+  testWidgets('the console is reachable from here, and only from here',
+      (tester) async {
+    // The one door into the operator side now that the two builds are one app.
+    // It sits below Tentang rather than in the tab bar: the citizen shell has
+    // three tabs, and that number is a decision.
+    final container = await _pump(tester);
+
+    await tester.scrollUntilVisible(find.text('Masuk sebagai operator'), 200);
+    await tester.tap(find.byKey(const ValueKey('switch-to-operator')));
+    await tester.pumpAndSettle();
+
+    expect(container.read(appModeProvider), AppMode.operator);
   });
 
   testWidgets('stored settings are restored on open', (tester) async {

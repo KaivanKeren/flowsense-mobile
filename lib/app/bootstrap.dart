@@ -8,46 +8,38 @@ import '../data/api/fake_flowsense_api.dart';
 import '../data/api/flowsense_api.dart';
 import '../data/api/http_flowsense_api.dart';
 import '../data/health/health_api.dart';
+import '../domain/app_mode.dart';
 import '../features/alerts/notifier.dart';
 import '../features/operator/operator_shell.dart';
 import '../features/operator/session_watcher.dart';
 import '../features/operator/login_screen.dart';
 import '../features/shell/warga_shell.dart';
 import '../state/alert_providers.dart';
+import '../state/app_mode_providers.dart';
 import '../state/auth_providers.dart';
 import '../state/health_providers.dart';
 import '../state/providers.dart';
 import 'theme.dart';
 
-/// The two audiences, from one codebase.
-///
-/// Not a runtime setting: each flavor is a separate entry point and a separate
-/// APK, so a citizen build cannot be talked into rendering the operator view.
-enum Flavor {
-  warga,
-  operator;
-
-  String get appTitle => switch (this) {
-        Flavor.warga => 'FlowSense',
-        Flavor.operator => 'FlowSense Operator',
-      };
-}
-
-/// The home screen for [flavor].
+/// The home screen for [mode].
 ///
 /// Jam alerts ride with `warga` only. The copy tells a rider to consider
 /// another route, which is advice for someone on the road — an operator is
-/// already looking at the dashboard that would have raised it.
-Widget homeFor(Flavor flavor) => switch (flavor) {
-      Flavor.warga => const JamAlertListener(child: WargaShell()),
-      Flavor.operator => const OperatorGate(),
+/// already looking at the dashboard that would have raised it. Switching to the
+/// console therefore stops jam notifications, by construction: the listener is
+/// part of the citizen shell, not of the app.
+Widget homeFor(AppMode mode) => switch (mode) {
+      AppMode.warga => const JamAlertListener(child: WargaShell()),
+      AppMode.operator => const OperatorGate(),
     };
 
 /// Login, or the console — never both, and never the console first.
 ///
-/// The console is gated rather than merely *linked to* a login screen: an
-/// operator build that rendered the dashboard before checking the session
-/// would start polling with no credentials and paper the screen in errors.
+/// The console is gated rather than merely *linked to* a login screen: this is
+/// what keeps a runtime mode switch honest. Anyone can press the button into
+/// operator mode; without a session it lands them on the login form, and the
+/// dashboard never renders, never polls, and never papers the screen in errors
+/// from requests carrying no credential.
 class OperatorGate extends ConsumerWidget {
   const OperatorGate({super.key});
 
@@ -109,11 +101,12 @@ Future<List<Override>> appOverrides(AppConfig config) async => [
       ...await demoOverrides(config),
     ];
 
-/// Everything both entry points do.
+/// Everything `lib/main.dart` does.
 ///
-/// `lib/main_warga.dart` and `lib/main_operator.dart` are one line each on
-/// purpose: a flavor is a choice of home screen, not a fork of the app.
-Future<void> bootstrap(Flavor flavor) async {
+/// One entry point, one APK, both audiences. Which shell opens is
+/// [appModeProvider]'s answer, restored from the last session and changed by
+/// the switch buttons in Langganan and Akun.
+Future<void> bootstrap() async {
   // The fixture fallback reads the asset bundle, which needs the binding up.
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -122,36 +115,34 @@ Future<void> bootstrap(Flavor flavor) async {
 
   // Logged without the key, and without the base URL — the fact that a backend
   // was configured is the diagnostic; its address is not needed here.
-  FlowLog.event('app start', fields: {
-    'flavor': flavor.name,
-    'configured': config.isConfigured,
-  });
+  FlowLog.event('app start', fields: {'configured': config.isConfigured});
 
   runApp(ProviderScope(
     overrides: overrides,
-    child: FlowSenseApp(flavor: flavor),
+    child: const FlowSenseApp(),
   ));
 }
 
-/// The shared app shell. Everything flavor-specific arrives through [flavor];
-/// there is no second `MaterialApp`.
-class FlowSenseApp extends StatelessWidget {
-  const FlowSenseApp({super.key, required this.flavor});
-
-  final Flavor flavor;
+/// The shared app shell. There is one `MaterialApp`, and the mode only chooses
+/// what it puts on screen.
+class FlowSenseApp extends ConsumerWidget {
+  const FlowSenseApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: flavor.appTitle,
-        theme: flowSenseTheme(),
-        // Warga is light-only, by decision rather than omission: the layout
-        // spec files dark mode under "deliberately not built" — it scores
-        // nothing and doubles the contrast checking. Operator has no such
-        // spec and keeps following the system.
-        darkTheme: flavor == Flavor.warga
-            ? null
-            : flowSenseTheme(brightness: Brightness.dark),
-        themeMode: flavor == Flavor.warga ? ThemeMode.light : ThemeMode.system,
-        home: homeFor(flavor),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(appModeProvider);
+    final isWarga = mode == AppMode.warga;
+
+    return MaterialApp(
+      title: mode.appTitle,
+      theme: flowSenseTheme(),
+      // Warga is light-only, by decision rather than omission: the layout
+      // spec files dark mode under "deliberately not built" — it scores
+      // nothing and doubles the contrast checking. Operator has no such
+      // spec and keeps following the system.
+      darkTheme: isWarga ? null : flowSenseTheme(brightness: Brightness.dark),
+      themeMode: isWarga ? ThemeMode.light : ThemeMode.system,
+      home: homeFor(mode),
+    );
+  }
 }

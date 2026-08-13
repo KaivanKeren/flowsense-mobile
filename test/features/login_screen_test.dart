@@ -6,6 +6,9 @@ import 'package:flowsense_mobile/core/config/app_config.dart';
 import 'package:flowsense_mobile/core/max_width.dart';
 import 'package:flowsense_mobile/data/auth/fake_auth_api.dart';
 import 'package:flowsense_mobile/data/auth/token_store.dart';
+import 'package:flowsense_mobile/data/prefs/app_mode_store.dart';
+import 'package:flowsense_mobile/domain/app_mode.dart';
+import 'package:flowsense_mobile/state/app_mode_providers.dart';
 import 'package:flowsense_mobile/features/operator/login_screen.dart';
 import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
@@ -29,6 +32,9 @@ Future<ProviderContainer> _pump(
     appConfigProvider.overrideWithValue(config),
     authApiProvider.overrideWithValue(api ?? FakeAuthApi()),
     tokenStoreProvider.overrideWithValue(store ?? FakeTokenStore()),
+    // Reached by pressing `Masuk sebagai operator`, so the mode is already
+    // operator by the time this screen is on show.
+    appModeStoreProvider.overrideWithValue(FakeAppModeStore(AppMode.operator)),
   ]);
   addTearDown(container.dispose);
 
@@ -83,6 +89,20 @@ void main() {
       expect(find.textContaining('Daftar'), findsNothing);
       expect(find.textContaining('Lupa sandi'), findsNothing);
       expect(find.textContaining('Google'), findsNothing);
+    });
+
+    testWidgets('offers a way back to the citizen app', (tester) async {
+      // The console is a mode now, not a separate install: someone can arrive
+      // here from Langganan without holding an account, and must not be left
+      // on a form they cannot fill in.
+      final container = await _pump(tester);
+      // How anyone gets here: the button in Langganan.
+      await container.read(appModeProvider.notifier).switchTo(AppMode.operator);
+
+      await tester.tap(find.byKey(const ValueKey('back-to-warga')));
+      await tester.pumpAndSettle();
+
+      expect(container.read(appModeProvider), AppMode.warga);
     });
 
     testWidgets('is one full-width column, not a floating card',

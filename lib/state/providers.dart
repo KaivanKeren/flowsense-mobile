@@ -29,12 +29,12 @@ final clockProvider = Provider<Clock>((ref) => const SystemClock());
 final snapshotCacheProvider =
     Provider<SnapshotCache?>((ref) => const SnapshotCache());
 
-/// **Always overridden at the root** — by `buildApi` in the entry points, and
-/// by a fake in tests. Throwing here means a missing override is a loud
-/// startup failure rather than a silent fallback to the network.
+/// **Always overridden at the root** — by `buildApi` in `bootstrap`, and by a
+/// fake in tests. Throwing here means a missing override is a loud startup
+/// failure rather than a silent fallback to the network.
 final apiProvider = Provider<FlowSenseApi>((ref) {
   throw UnimplementedError(
-    'apiProvider must be overridden in ProviderScope (see lib/main_*.dart)',
+    'apiProvider must be overridden in ProviderScope (see lib/app/bootstrap.dart)',
   );
 });
 

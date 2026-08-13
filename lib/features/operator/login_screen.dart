@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme.dart';
 import '../../core/max_width.dart';
 import '../../data/auth/fake_auth_api.dart';
+import '../../domain/app_mode.dart';
+import '../../state/app_mode_providers.dart';
 import '../../state/auth_providers.dart';
 
 /// The operator console's front door.
@@ -175,6 +177,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textAlign: TextAlign.center,
                       style: text.bodySmall?.copyWith(
                         color: surfaces.textFaint,
+                      ),
+                    ),
+                    // The way out. Since the console is a mode rather than a
+                    // separate install, someone can arrive here by pressing a
+                    // button in Langganan without holding an account — and
+                    // must not be left on a form they cannot fill in, with no
+                    // route back to the map.
+                    const SizedBox(height: 8),
+                    Center(
+                      child: TextButton(
+                        key: const ValueKey('back-to-warga'),
+                        // Ink rather than the scheme's seeded blue, like every
+                        // other control on this screen.
+                        style: TextButton.styleFrom(
+                          foregroundColor: surfaces.textPrimary,
+                        ),
+                        onPressed: () => ref
+                            .read(appModeProvider.notifier)
+                            .switchTo(AppMode.warga),
+                        child: const Text('Kembali ke tampilan warga'),
                       ),
                     ),
                   ],

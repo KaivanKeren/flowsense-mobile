@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme.dart';
 import '../../core/app_version.dart';
 import '../../core/max_width.dart';
+import '../../domain/app_mode.dart';
+import '../../state/app_mode_providers.dart';
 import '../../state/auth_providers.dart';
 import '../tentang/tentang_screen.dart';
 
@@ -51,6 +53,19 @@ class AkunScreen extends ConsumerWidget {
               ),
             ),
             Divider(height: 1, color: surfaces.roadLine),
+            // The way back, and deliberately not `Keluar`. Switching view
+            // keeps the session: an operator who wants to check the map the
+            // way a rider sees it should not have to re-enter a password to
+            // come back. Signing out is the row at the bottom, and it is a
+            // different decision.
+            _Row(
+              key: const ValueKey('switch-to-warga'),
+              label: 'Beralih ke tampilan warga',
+              icon: Icons.map_outlined,
+              onTap: () => unawaited(
+                ref.read(appModeProvider.notifier).switchTo(AppMode.warga),
+              ),
+            ),
             _Row(
               label: 'Tentang dan sumber data',
               onTap: () => unawaited(Navigator.of(context).push(
@@ -110,9 +125,19 @@ class AkunScreen extends ConsumerWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.label, this.trailing, this.onTap});
+  const _Row({
+    super.key,
+    required this.label,
+    this.trailing,
+    this.onTap,
+    this.icon,
+  });
 
   final String label;
+
+  /// A leading icon, for a row that changes what the app is showing rather
+  /// than opening a page.
+  final IconData? icon;
 
   /// A value shown instead of a chevron — a row that states something rather
   /// than leading somewhere.
@@ -135,6 +160,10 @@ class _Row extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
+              if (icon != null) ...[
+                Icon(icon, size: 20, color: surfaces.textPrimary),
+                const SizedBox(width: 12),
+              ],
               Expanded(child: Text(label, style: text.titleMedium)),
               if (trailing != null)
                 Text(
