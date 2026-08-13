@@ -14,7 +14,11 @@ void main() {
       .listSync(recursive: true)
       .whereType<File>()
       .where((f) => f.path.endsWith('.dart'))
-      .where((f) => !f.path.endsWith('app/theme.dart'))
+      // `lib/theme/` is the one room a hex is allowed in. It used to be the
+      // single file `app/theme.dart`; the design system outgrew one file, but
+      // the rule is unchanged — colour is decided in one place and reached
+      // everywhere else through a ThemeExtension.
+      .where((f) => !f.path.startsWith('lib/theme/'))
       .toList();
 
   test('there are files to check', () {
@@ -66,17 +70,19 @@ void main() {
         reason: 'the palette is the token table, not Material defaults');
   });
 
-  test('each congestion hex is declared exactly once, in theme.dart', () {
-    // Comments are skipped: the doc on PillColors quotes #D64541 to explain
-    // why the pill ink is *not* that value, and that explanation is worth
-    // more than a tidier regex.
-    final code = File('lib/app/theme.dart')
+  test('each congestion hex is declared exactly once, in colors.dart', () {
+    // Comments are skipped: the docs there quote the *rejected* values —
+    // #E0A32E, #9AA0A0 — to explain why the shipped token is not that colour,
+    // and those explanations are worth more than a tidier regex.
+    final code = File('lib/theme/colors.dart')
         .readAsLinesSync()
         .where((l) => !l.trimLeft().startsWith('///'))
         .where((l) => !l.trimLeft().startsWith('//'))
         .join('\n');
 
-    for (final hex in ['1F9D62', 'E0A32E', 'D64541']) {
+    // Light `padat` is #B57C0A rather than the older #E0A32E: amber on white
+    // measured 2.07:1, below the 3:1 a graphic mark owes.
+    for (final hex in ['1F9D62', 'B57C0A', 'D64541']) {
       expect(
         RegExp(hex, caseSensitive: false).allMatches(code).length,
         1,

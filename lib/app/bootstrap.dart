@@ -19,6 +19,7 @@ import '../state/app_mode_providers.dart';
 import '../state/auth_providers.dart';
 import '../state/health_providers.dart';
 import '../state/providers.dart';
+import '../state/theme_providers.dart';
 import 'theme.dart';
 
 /// The home screen for [mode].
@@ -131,17 +132,18 @@ class FlowSenseApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(appModeProvider);
-    final isWarga = mode == AppMode.warga;
 
     return MaterialApp(
       title: mode.appTitle,
       theme: flowSenseTheme(),
-      // Warga is light-only, by decision rather than omission: the layout
-      // spec files dark mode under "deliberately not built" — it scores
-      // nothing and doubles the contrast checking. Operator has no such
-      // spec and keeps following the system.
-      darkTheme: isWarga ? null : flowSenseTheme(brightness: Brightness.dark),
-      themeMode: isWarga ? ThemeMode.light : ThemeMode.system,
+      // Both flavors, both themes. Dark used to be operator-only and was
+      // broken besides — it installed the *light* surface tokens under a dark
+      // `ColorScheme`, so the console rendered near-black text on a near-black
+      // page. Now the palette has a real dark variant, and the choice belongs
+      // to the person holding the phone rather than to the flavor: a rider
+      // checking traffic at night has the same eyes as an operator.
+      darkTheme: flowSenseTheme(brightness: Brightness.dark),
+      themeMode: ref.watch(themeModeProvider),
       home: homeFor(mode),
     );
   }

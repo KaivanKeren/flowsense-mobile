@@ -8,6 +8,7 @@ import 'package:flowsense_mobile/data/api/http_flowsense_api.dart';
 import 'package:flowsense_mobile/data/auth/fake_auth_api.dart';
 import 'package:flowsense_mobile/data/auth/token_store.dart';
 import 'package:flowsense_mobile/data/prefs/app_mode_store.dart';
+import 'package:flowsense_mobile/data/prefs/theme_mode_store.dart';
 import 'package:flowsense_mobile/domain/app_mode.dart';
 import 'package:flowsense_mobile/features/alerts/notifier.dart';
 import 'package:flowsense_mobile/features/common/feed_view.dart';
@@ -18,6 +19,7 @@ import 'package:flowsense_mobile/features/shell/warga_shell.dart';
 import 'package:flowsense_mobile/state/app_mode_providers.dart';
 import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
+import 'package:flowsense_mobile/state/theme_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,6 +67,9 @@ Future<ProviderContainer> _pumpApp(
     // `shared_preferences`; here it is memory, and it is also what lets a test
     // start on the console.
     appModeStoreProvider.overrideWithValue(FakeAppModeStore(mode)),
+    // Same reason: `PrefsThemeModeStore` reaches `shared_preferences` over a
+    // platform channel, which no widget test should touch.
+    themeModeStoreProvider.overrideWithValue(FakeThemeModeStore()),
   ]);
   addTearDown(container.dispose);
 
@@ -118,23 +123,37 @@ void main() {
     expect(find.text('profil'), findsNothing);
   });
 
-  testWidgets('warga is light-only, by decision', (tester) async {
-    await _pumpApp(tester, AppMode.warga);
+  testWidgets('both flavors ship both themes', (tester) async {
+    // Warga used to be light-only and the console dark-capable. That split is
+    // gone: the theme is now the user's choice rather than the flavor's, and
+    // the dark variant it used to lack is a real palette instead of Material's
+    // defaults over light tokens.
+    for (final mode in AppMode.values) {
+      await _pumpApp(tester, mode);
 
-    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(app.darkTheme, isNull);
-    expect(app.themeMode, ThemeMode.light);
+      final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(app.theme, isNotNull);
+      expect(app.darkTheme, isNotNull, reason: '$mode');
+    }
   });
 
-  testWidgets('the console follows the system theme', (tester) async {
-    // Not a symmetric decision: only warga has a layout spec that rules dark
-    // mode out. Switching mode has to move the theme with it, or the console
-    // inherits a rule written for the citizen app.
-    await _pumpApp(tester, AppMode.operator);
+  testWidgets('the theme follows the stored preference, not the flavor',
+      (tester) async {
+    final container = await _pumpApp(tester, AppMode.warga);
 
-    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(app.darkTheme, isNotNull);
-    expect(app.themeMode, ThemeMode.system);
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.system,
+      reason: 'nothing chosen yet',
+    );
+
+    await container.read(themeModeProvider.notifier).setMode(ThemeMode.dark);
+    await tester.pump();
+
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.dark,
+    );
   });
 
   testWidgets('a signed-in operator lands on the dashboard', (tester) async {

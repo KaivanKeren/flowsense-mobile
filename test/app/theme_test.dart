@@ -26,22 +26,56 @@ void main() {
 
   group('tokens match the layout spec', () {
     test('the surface and congestion palette is exactly the token table', () {
+      // Three values moved when the design system gained a real contrast
+      // budget, and each is recorded on its token in `theme/colors.dart`:
+      //
+      //   textSecondary  #6B706E → #666B69  (4.40:1 on surfaceElevated)
+      //   padat          #E0A32E → #B57C0A  (2.07:1 as a mark on white)
+      //   unknown        #9AA0A0 → #828888  (2.48:1 as a mark on white)
+      //
+      // `test/theme/contrast_test.dart` is what holds them there now; this
+      // test only pins that they are the *same* values the tokens declare.
       expect(surfaces.page, const Color(0xFFF7F7F5));
       expect(surfaces.card, const Color(0xFFFFFFFF));
       expect(surfaces.map, const Color(0xFFEEF0ED));
       expect(surfaces.roadLine, const Color(0xFFE3E5E2));
       expect(surfaces.textPrimary, const Color(0xFF1A1D1C));
-      expect(surfaces.textSecondary, const Color(0xFF6B706E));
+      expect(surfaces.textSecondary, const Color(0xFF666B69));
       expect(congestion.lancar, const Color(0xFF1F9D62));
-      expect(congestion.padat, const Color(0xFFE0A32E));
+      expect(congestion.padat, const Color(0xFFB57C0A));
       expect(congestion.macet, const Color(0xFFD64541));
-      expect(congestion.unknown, const Color(0xFF9AA0A0));
+      expect(congestion.unknown, const Color(0xFF828888));
     });
 
-    test('#9AA0A0 survives as the non-text faint ink', () {
-      // The spec's `Teks samar` value is kept exactly — for icons, handles and
-      // the unknown fill, where the contrast rule does not apply.
-      expect(surfaces.faintInk, const Color(0xFF9AA0A0));
+    test('the legacy surfaces are views onto the semantic tokens', () {
+      // `FlowSurfaces` holds no colours of its own any more. If these drift
+      // apart there are two palettes again, which is the thing the whole
+      // token table exists to prevent.
+      const tokens = AppColors.light;
+      expect(surfaces.page, tokens.surfaceCanvas);
+      expect(surfaces.card, tokens.surfaceCard);
+      expect(surfaces.map, tokens.surfaceElevated);
+      expect(surfaces.roadLine, tokens.borderSubtle);
+      expect(surfaces.textPrimary, tokens.textPrimary);
+      expect(surfaces.textSecondary, tokens.textSecondary);
+      expect(surfaces.textFaint, tokens.textMuted);
+      expect(surfaces.faintInk, tokens.statusUnknown);
+      expect(surfaces.errorInk, tokens.statusEmergency);
+      expect(congestion.lancar, tokens.statusNormal);
+      expect(congestion.padat, tokens.statusWarning);
+      expect(congestion.macet, tokens.statusCritical);
+      expect(congestion.unknown, tokens.statusUnknown);
+    });
+
+    test('the dark theme has real surface tokens, not the light ones', () {
+      // The defect this replaced: `flowSenseTheme(brightness: dark)` installed
+      // `FlowSurfaces.light` under a dark `ColorScheme`, so every widget that
+      // asked for `textPrimary` drew #1A1D1C on a near-black page.
+      final dark = flowSenseTheme(brightness: Brightness.dark)
+          .extension<FlowSurfaces>()!;
+      expect(dark.page, AppColors.dark.surfaceCanvas);
+      expect(dark.textPrimary, AppColors.dark.textPrimary);
+      expect(dark.page, isNot(FlowSurfaces.light.page));
     });
 
     test('radii are 8 / 12 / 16 and there is no fourth value', () {
@@ -175,11 +209,18 @@ void main() {
       expect(theme.dividerTheme.color, surfaces.roadLine);
     });
 
-    test('controls meet the 44 px touch floor', () {
+    test('controls meet the 48 dp touch floor', () {
+      // 48, not the 44 this used to allow. 44 is Apple's number; Material and
+      // WCAG 2.5.5 both say 48, and part of this app's audience is elderly.
       final theme = flowSenseTheme();
-      final size = theme.filledButtonTheme.style!.minimumSize!
-          .resolve(<WidgetState>{});
-      expect(size!.height, greaterThanOrEqualTo(44));
+      for (final style in [
+        theme.filledButtonTheme.style,
+        theme.outlinedButtonTheme.style,
+        theme.textButtonTheme.style,
+      ]) {
+        final size = style!.minimumSize!.resolve(<WidgetState>{});
+        expect(size!.height, greaterThanOrEqualTo(FlowTouch.minTarget));
+      }
     });
   });
 
