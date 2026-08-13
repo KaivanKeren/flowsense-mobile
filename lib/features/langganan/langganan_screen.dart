@@ -27,7 +27,7 @@ class LanggananScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: colors.surfaceCanvas,
-      appBar: AppBar(title: const Text('Langganan'), titleSpacing: FlowSpace.lg),
+      appBar: AppBar(title: const Text('Notifikasi'), titleSpacing: FlowSpace.lg),
       body: MaxWidth448(
         child: ListView(
           padding: const EdgeInsets.only(bottom: FlowSpace.xl),

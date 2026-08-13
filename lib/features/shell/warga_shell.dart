@@ -27,7 +27,7 @@ abstract final class WargaRoutes {
 enum WargaTab {
   peta(label: 'peta', icon: Icons.map_outlined),
   simpang(label: 'simpang', icon: Icons.traffic_outlined),
-  langganan(label: 'langganan', icon: Icons.subscriptions_outlined);
+  langganan(label: 'notifikasi', icon: Icons.subscriptions_outlined);
 
   const WargaTab({required this.label, required this.icon});
 

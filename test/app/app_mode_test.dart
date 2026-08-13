@@ -118,7 +118,7 @@ void main() {
     // Three, and only three. `Laporan` and `Profil` are refused on purpose.
     expect(find.text('peta'), findsOneWidget);
     expect(find.text('simpang'), findsOneWidget);
-    expect(find.text('langganan'), findsOneWidget);
+    expect(find.text('notifikasi'), findsOneWidget);
     expect(find.text('laporan'), findsNothing);
     expect(find.text('profil'), findsNothing);
   });
