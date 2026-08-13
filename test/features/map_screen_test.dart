@@ -9,11 +9,11 @@ import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
 import 'package:flowsense_mobile/domain/congestion.dart';
-import 'package:flowsense_mobile/features/common/stale_banner.dart';
 import 'package:flowsense_mobile/features/detail/intersection_sheet.dart';
 import 'package:flowsense_mobile/features/map/intersection_marker.dart';
 import 'package:flowsense_mobile/features/map/map_screen.dart';
 import 'package:flowsense_mobile/state/providers.dart';
+import 'package:flowsense_mobile/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -196,7 +196,7 @@ void main() {
       ])),
     );
 
-    expect(find.byType(StaleBanner), findsOneWidget);
+    expect(find.byType(StaleNotice), findsOneWidget);
     expect(find.textContaining('Data terakhir 2 menit lalu'), findsOneWidget);
 
     final markers =
@@ -250,7 +250,7 @@ void main() {
     await container.read(repositoryProvider).poll();
     await tester.pumpAndSettle();
 
-    expect(find.byType(StaleBanner), findsOneWidget);
+    expect(find.byType(StaleNotice), findsOneWidget);
     expect(find.byType(IntersectionMarker), findsNWidgets(2),
         reason: 'a failed poll must not blank the map');
   });

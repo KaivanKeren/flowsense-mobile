@@ -106,8 +106,9 @@ class IntersectionMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final congestion = CongestionColors.of(context);
+    final type = FlowTypography.of(context);
     final size = diameter;
 
     final marker = SizedBox(
@@ -116,24 +117,24 @@ class IntersectionMarker extends StatelessWidget {
       child: CustomPaint(
         painter: _MarkerPainter(
           fill: hasData
-              ? colorFor(colors, level, isStale: isStale)
-              : surfaces.card,
-          outline: surfaces.card,
-          emptyOutline: surfaces.faintInk,
+              ? colorFor(congestion, level, isStale: isStale)
+              : colors.surfaceCard,
+          outline: colors.surfaceCard,
+          emptyOutline: colors.statusUnknown,
           hasData: hasData,
           isSelected: isSelected,
-          arcs: _arcs(colors, surfaces),
+          arcs: _arcs(congestion),
         ),
         child: Center(
           child: Text(
             hasData ? '${record!.totalVehicles}' : '?',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  // On a filled core the number sits on a saturated hue, so it
-                  // is white; on the empty core it sits on white, so it is ink.
-                  color: hasData ? surfaces.card : surfaces.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
+            style: type.caption.copyWith(
+              // On a filled core the number sits on a saturated hue, so it
+              // is white; on the empty core it sits on white, so it is ink.
+              color: hasData ? colors.surfaceCard : colors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),
@@ -161,7 +162,7 @@ class IntersectionMarker extends StatelessWidget {
   /// Equal arcs are the point: the ring answers "which approach is blocked",
   /// and weighting each arc by its own count would shrink exactly the arc a
   /// rider most needs to see when one lane empties while another jams.
-  List<Color> _arcs(CongestionColors colors, FlowSurfaces surfaces) {
+  List<Color> _arcs(CongestionColors colors) {
     final perLane = record?.perLane ?? const <String, int>{};
     if (perLane.isEmpty) {
       return List.filled(placeholderArcs, colors.unknown);
