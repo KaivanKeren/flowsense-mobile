@@ -178,7 +178,9 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      expect(find.text('Per lajur'), findsOneWidget);
+      // The console's section headings are set in monospace capitals, so the
+      // strings on screen are uppercase.
+      expect(find.text('PER LAJUR'), findsOneWidget);
       for (final lane in ['kota', 'ploso', 'demak', 'sekoe']) {
         expect(_laneRow(lane), findsOneWidget, reason: lane);
       }
@@ -268,7 +270,7 @@ void main() {
     testWidgets('draws 96 bars, one per quarter hour', (tester) async {
       await _pump(tester);
 
-      expect(find.text('Riwayat 24 jam'), findsOneWidget);
+      expect(find.text('RIWAYAT 24 JAM'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('history-bars')),
         findsOneWidget,
@@ -324,8 +326,8 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      await tester.scrollUntilVisible(find.text('Sumber data'), 200);
-      expect(find.text('Sumber data'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('SUMBER DATA'), 200);
+      expect(find.text('SUMBER DATA'), findsOneWidget);
       expect(find.textContaining('Kamera 30'), findsOneWidget);
       // Seconds included: an operator checking a stalled feed needs them.
       expect(find.textContaining('16:42:07'), findsOneWidget);

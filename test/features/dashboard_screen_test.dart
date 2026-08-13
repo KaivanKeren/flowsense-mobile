@@ -393,7 +393,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DetailScreen), findsOneWidget);
-      expect(find.text('Per lajur'), findsOneWidget);
+      expect(find.text('PER LAJUR'), findsOneWidget);
     });
 
     testWidgets('every row carries a status pill with words on it',
