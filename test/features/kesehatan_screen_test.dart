@@ -93,7 +93,7 @@ void main() {
     testWidgets('says what the screen is for', (tester) async {
       await _pump(tester);
 
-      expect(find.text('Kesehatan connector'), findsOneWidget);
+      expect(find.text('Kesehatan'), findsOneWidget);
       expect(
         find.textContaining('perangkat lunak yang memproses citra'),
         findsOneWidget,

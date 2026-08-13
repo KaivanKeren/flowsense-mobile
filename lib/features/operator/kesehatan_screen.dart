@@ -5,6 +5,7 @@ import '../../app/theme.dart';
 import '../../core/max_width.dart';
 import '../../domain/connector_health.dart';
 import '../../state/health_providers.dart';
+import '../../widgets/widgets.dart';
 
 /// Are the connectors alive?
 ///
@@ -18,97 +19,65 @@ class KesehatanScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final health = ref.watch(connectorHealthProvider);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
+      appBar: AppBar(
+        title: const Text('Kesehatan'),
+        titleSpacing: FlowSpace.lg,
+      ),
       body: MaxWidth448(
-        child: SafeArea(
-          child: Column(
-            key: const ValueKey('kesehatan-list'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Kesehatan connector', style: text.titleLarge),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Status perangkat lunak yang memproses citra tiap '
-                      'kamera.',
-                      style: text.bodyMedium
-                          ?.copyWith(color: surfaces.textSecondary),
-                    ),
-                  ],
-                ),
+        child: Column(
+          key: const ValueKey('kesehatan-list'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                FlowSpace.lg,
+                FlowSpace.sm,
+                FlowSpace.lg,
+                FlowSpace.sm,
               ),
-              Divider(height: 1, color: surfaces.roadLine),
-              Expanded(
-                child: switch (health) {
-                  AsyncLoading() =>
-                    const Center(child: CircularProgressIndicator()),
-                  AsyncError() => _CouldNotLoad(
-                      onRetry: () => ref.invalidate(connectorHealthProvider),
-                    ),
-                  AsyncData(:final value) when value.isEmpty => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Belum ada connector terdaftar.',
-                          style: text.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                  AsyncData(:final value) => ListView.separated(
-                      padding: EdgeInsets.zero,
-                      itemCount: value.length,
-                      separatorBuilder: (_, _) =>
-                          Divider(height: 1, color: surfaces.roadLine),
-                      itemBuilder: (context, i) =>
-                          _ConnectorRow(health: value[i]),
-                    ),
-                  _ => const SizedBox.shrink(),
-                },
+              child: Text(
+                'Status perangkat lunak yang memproses citra tiap kamera.',
+                style: type.caption.copyWith(color: colors.textSecondary),
               ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: switch (health) {
+                // Loading. A skeleton in the shape of the connector rows, so
+                // the page says what is coming instead of asking for patience.
+                AsyncLoading() => const SkeletonList(rows: 5),
+                AsyncError() => MessageState.error(
+                    title: 'Tidak dapat memuat status',
+                    message: 'Status connector tidak dapat dimuat.',
+                    actionLabel: 'Coba lagi',
+                    onAction: () => ref.invalidate(connectorHealthProvider),
+                  ),
+                AsyncData(:final value) when value.isEmpty =>
+                  const MessageState.empty(
+                    title: 'Belum ada connector',
+                    message: 'Belum ada connector terdaftar.',
+                  ),
+                AsyncData(:final value) => ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: value.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1, color: colors.borderSubtle),
+                    itemBuilder: (context, i) =>
+                        _ConnectorRow(health: value[i]),
+                  ),
+                _ => const SizedBox.shrink(),
+              },
+            ),
+          ],
         ),
       ),
     );
   }
-}
-
-class _CouldNotLoad extends StatelessWidget {
-  const _CouldNotLoad({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Status connector tidak dapat dimuat.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: onRetry,
-                child: const Text('Coba lagi'),
-              ),
-            ],
-          ),
-        ),
-      );
 }
 
 /// Identity on the first line, vitals on the second.
@@ -124,14 +93,16 @@ class _ConnectorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     final detail = healthDetail(health);
 
     final row = Container(
       key: ValueKey('connector-${health.cameraId}'),
-      constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      constraints: const BoxConstraints(minHeight: FlowTouch.minTarget),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlowSpace.lg,
+        vertical: FlowSpace.md,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -139,18 +110,21 @@ class _ConnectorRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(health.title, style: text.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  detail,
-                  style:
-                      text.bodySmall?.copyWith(color: surfaces.textSecondary),
-                ),
+                Text(health.title, style: type.sectionTitle),
+                const SizedBox(height: FlowSpace.xs),
+                Text(detail, style: type.caption),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          _HealthPill(status: health.status),
+          const SizedBox(width: FlowSpace.md),
+          StatusChip(
+            label: health.status.label,
+            tone: _toneFor(health.status),
+            // No prefix: the row's own Semantics already says which connector
+            // this is, and repeating it would have a screen reader announce
+            // the name twice.
+            semanticsPrefix: null,
+          ),
         ],
       ),
     );
@@ -165,42 +139,15 @@ class _ConnectorRow extends StatelessWidget {
   }
 }
 
-/// The state, in words.
+/// The state, in words, at the severity the palette assigns it.
 ///
-/// A healthy connector gets a neutral pill rather than a green one: green is
+/// A healthy connector gets a neutral chip rather than a green one: green is
 /// spoken for by `Lancar`, and the two appear side by side on the dashboard.
-/// Anything needing attention gets the one non-congestion red.
-class _HealthPill extends StatelessWidget {
-  const _HealthPill({required this.status});
-
-  final ConnectorStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final colors = CongestionColors.of(context);
-
-    final pill = status.needsAttention
-        ? surfaces.errorPill
-        // The neutral grey pair, borrowed for "nothing to report" — it makes
-        // no colour claim, which is the honest thing for a healthy process.
-        : colors.unknownPill;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: pill.tint,
-        borderRadius: BorderRadius.circular(FlowRadius.control),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: Text(
-          status.label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: pill.ink, fontWeight: FontWeight.w500),
-        ),
-      ),
-    );
-  }
-}
+/// A connector still running but losing records gets the warning tone, and one
+/// that has stopped gets the attention red — never the congestion hues, which
+/// are reserved for road conditions.
+StatusTone _toneFor(ConnectorStatus status) => switch (status) {
+      ConnectorStatus.berjalan => StatusTone.neutral,
+      ConnectorStatus.terputus => StatusTone.warning,
+      ConnectorStatus.berhenti => StatusTone.emergency,
+    };
