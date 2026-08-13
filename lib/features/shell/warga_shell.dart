@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' show TileProvider;
 
-import '../../app/theme.dart';
-import '../../core/max_width.dart';
+import '../../widgets/flow_tab_bar.dart';
 import '../langganan/langganan_screen.dart';
 import '../map/map_screen.dart';
 import '../simpang/simpang_screen.dart';
@@ -80,108 +79,13 @@ class WargaShellState extends State<WargaShell> {
             const LanggananScreen(),
           ],
         ),
-        bottomNavigationBar: _TabBar(
+        bottomNavigationBar: FlowTabBar<WargaTab>(
+          tabs: [
+            for (final tab in WargaTab.values)
+              FlowTab(value: tab, label: tab.label, icon: tab.icon),
+          ],
           current: _tab,
           onChanged: go,
         ),
       );
-}
-
-/// Hand-built rather than a [NavigationBar], because the spec's active state is
-/// a soft grey capsule behind the icon *and* its label — Material's indicator
-/// wraps the icon alone and cannot be talked into including the text.
-class _TabBar extends StatelessWidget {
-  const _TabBar({required this.current, required this.onChanged});
-
-  final WargaTab current;
-  final ValueChanged<WargaTab> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: surfaces.page,
-        border: Border(top: BorderSide(color: surfaces.roadLine)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: MaxWidth448(
-          // The bar must hug its content. Without this it fills the screen and
-          // the Scaffold hands the body zero height.
-          shrinkWrapHeight: true,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              children: [
-                for (final tab in WargaTab.values)
-                  Expanded(
-                    child: _Tab(
-                      tab: tab,
-                      isActive: tab == current,
-                      onTap: () => onChanged(tab),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.tab,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final WargaTab tab;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
-
-    // Inactive tabs use the spec's #9AA0A0 for the icon but a readable ink for
-    // the label: a tab name is text, and text owes 4.5:1.
-    final iconColor = isActive ? surfaces.textPrimary : surfaces.faintInk;
-    final labelColor = isActive ? surfaces.textPrimary : surfaces.textFaint;
-
-    return Semantics(
-      button: true,
-      selected: isActive,
-      label: tab.label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            color: isActive ? surfaces.map : null,
-            borderRadius: BorderRadius.circular(FlowRadius.card),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(tab.icon, size: 22, color: iconColor),
-              const SizedBox(height: 2),
-              Text(
-                tab.label,
-                style: text.bodySmall?.copyWith(color: labelColor),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

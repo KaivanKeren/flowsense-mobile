@@ -112,7 +112,11 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      expect(find.text('Kalibrasi — Simpang DPRD'), findsOneWidget);
+      // The bar names the screen and the body names the intersection. One
+      // combined app-bar title was 5 px short of fitting at 320 px and
+      // textScale 1.3, and shipped as `Kalibrasi — Simpang DPR…`.
+      expect(find.text('Kalibrasi'), findsOneWidget);
+      expect(find.text('Simpang DPRD'), findsOneWidget);
       expect(
         find.text(
           'Kapasitas adalah jumlah kendaraan yang memenuhi lajur saat '

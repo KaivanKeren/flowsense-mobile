@@ -11,9 +11,9 @@ import '../../domain/history.dart';
 import '../../domain/lane_label.dart';
 import '../../domain/video_panel_state.dart';
 import '../../state/providers.dart';
+import '../../widgets/status_chip.dart';
 import '../common/feed_view.dart';
 import '../common/stale_banner.dart';
-import '../common/status_pill.dart';
 import 'kalibrasi_screen.dart';
 
 /// One intersection, in the depth an operator needs.
@@ -42,23 +42,13 @@ class DetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: surfaces.page,
-      appBar: AppBar(
-        title: Text(intersection?.name ?? 'Simpang'),
-        actions: [
-          if (intersection != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => KalibrasiScreen(cameraId: cameraId),
-                  ),
-                ),
-                child: const Text('Kalibrasi'),
-              ),
-            ),
-        ],
-      ),
+      // Title only. The `Kalibrasi` button used to sit in `actions`, and an
+      // app bar gives its title whatever the actions leave — so at 320 px and
+      // textScale 1.3 `Simpang DPRD` was handed 165 of the 169 px it needed
+      // and rendered as `Simpang DPR…`. The button moves into the header
+      // below, where it has the full column width and a name of any length
+      // fits beside it.
+      appBar: AppBar(title: Text(intersection?.name ?? 'Simpang')),
       body: MaxWidth448(
         child: Builder(
           key: const ValueKey('detail-body'),
@@ -91,8 +81,9 @@ class DetailScreen extends ConsumerWidget {
                         level: level,
                         isStale: stale,
                         now: now,
+                        cameraId: cameraId,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: FlowSpace.md),
                       const _CameraPanel(),
                       const SizedBox(height: 20),
                       _Section(
@@ -140,34 +131,51 @@ class _Header extends StatelessWidget {
     required this.level,
     required this.isStale,
     required this.now,
+    required this.cameraId,
   });
 
   final TrafficRecord? record;
   final CongestionLevel level;
   final bool isStale;
   final DateTime now;
+  final String cameraId;
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     final reading = record;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(
+        FlowSpace.lg,
+        FlowSpace.sm,
+        FlowSpace.lg,
+        0,
+      ),
+      // Wrap rather than Row: the chip, the reading and the button are three
+      // items of unpredictable width, and at textScale 1.3 on a 320 px screen
+      // they stop fitting on one line. Wrapping puts the button underneath;
+      // a Row would have overflowed or squeezed the reading to nothing.
+      child: Wrap(
+        spacing: FlowSpace.md,
+        runSpacing: FlowSpace.sm,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          StatusPill(level: level, isStale: isStale),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              reading == null
-                  ? 'Belum ada data untuk simpang ini'
-                  : '${reading.totalVehicles} kendaraan · '
-                      '${relativeIndonesian(now.difference(reading.ts))}',
-              style:
-                  text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+          StatusChip.congestion(level: level, isStale: isStale),
+          Text(
+            reading == null
+                ? 'Belum ada data untuk simpang ini'
+                : '${reading.totalVehicles} kendaraan · '
+                    '${relativeIndonesian(now.difference(reading.ts))}',
+            style: type.metricUnit,
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => KalibrasiScreen(cameraId: cameraId),
+              ),
             ),
+            child: const Text('Kalibrasi'),
           ),
         ],
       ),

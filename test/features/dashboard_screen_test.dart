@@ -172,10 +172,17 @@ void main() {
     testWidgets('counts the four states across the top', (tester) async {
       await _pump(tester);
 
+      // The metric labels are set in the console's monospace capitals, so the
+      // visible string is uppercase. The sentence-case original is what the
+      // screen reader hears — see the semantics test below — because TalkBack
+      // handed `TANPA DATA` may spell it out letter by letter.
+      expect(find.text('MACET'), findsOneWidget);
+      expect(find.text('PADAT'), findsOneWidget);
+      expect(find.text('LANCAR'), findsOneWidget);
+      expect(find.text('TANPA DATA'), findsOneWidget);
+
+      // The status chips beside each intersection keep sentence case.
       expect(find.text('Macet'), findsWidgets);
-      expect(find.text('Padat'), findsWidgets);
-      expect(find.text('Lancar'), findsWidgets);
-      expect(find.text('Tanpa data'), findsOneWidget);
 
       // 1 macet, 1 padat, 1 lancar, 1 stale.
       for (final label in ['Macet', 'Padat', 'Lancar', 'Tanpa data']) {

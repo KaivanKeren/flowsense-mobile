@@ -7,6 +7,7 @@ library;
 
 export 'alert_banner.dart';
 export 'app_card.dart';
+export 'flow_tab_bar.dart';
 export 'live_indicator.dart';
 export 'metric_card.dart';
 export 'recommendation_card.dart';

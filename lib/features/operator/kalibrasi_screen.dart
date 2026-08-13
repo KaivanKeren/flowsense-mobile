@@ -152,25 +152,36 @@ class _KalibrasiScreenState extends ConsumerState<KalibrasiScreen> {
 
     return Scaffold(
       backgroundColor: surfaces.page,
-      appBar: AppBar(
-        title: Text(
-          intersection == null
-              ? 'Kalibrasi'
-              : 'Kalibrasi — ${intersection.name}',
-        ),
-      ),
+      // `Kalibrasi — Simpang DPRD` needed 293 px and was given 288 at
+      // textScale 1.3 on a 320 px screen, so it shipped as
+      // `Kalibrasi — Simpang DPR…`. The name is not chrome and does not
+      // belong in a bar sized by whatever is left over; it leads the body
+      // instead, where it can wrap.
+      appBar: AppBar(title: const Text('Kalibrasi')),
       body: intersection == null
           ? const Center(child: CircularProgressIndicator())
           : MaxWidth448(
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    child: Text(
-                      'Kapasitas adalah jumlah kendaraan yang memenuhi lajur '
-                      'saat berhenti total.',
-                      style: text.bodyMedium
-                          ?.copyWith(color: surfaces.textSecondary),
+                    padding: const EdgeInsets.fromLTRB(
+                      FlowSpace.lg,
+                      FlowSpace.md,
+                      FlowSpace.lg,
+                      FlowSpace.lg,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(intersection.name, style: text.titleLarge),
+                        const SizedBox(height: FlowSpace.xs),
+                        Text(
+                          'Kapasitas adalah jumlah kendaraan yang memenuhi '
+                          'lajur saat berhenti total.',
+                          style: text.bodyMedium
+                              ?.copyWith(color: surfaces.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
                   Expanded(

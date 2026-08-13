@@ -16,6 +16,7 @@ import '../../domain/status_summary.dart';
 import '../../state/alert_providers.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import '../../widgets/widgets.dart';
 import '../common/failure_state.dart';
 import '../common/feed_view.dart';
 import '../common/stale_banner.dart';
@@ -134,44 +135,60 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
-    final auth = ref.watch(authProvider);
+    final colors = AppColors.of(context);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
       appBar: AppBar(
         // The layout doc names the route but not the title; the reference
         // image labels it `Dashboard`, so the image stands.
         title: const Text('Dashboard'),
-        titleSpacing: 16,
+        titleSpacing: FlowSpace.lg,
         actions: [
           // Says the numbers are bundled fixtures rather than live traffic.
           // Never dropped to make room for chrome: degrading to fixtures keeps
           // a demo alive, doing it silently passes canned data off as real.
           if (ref.watch(isDemoProvider)) const DemoBadge(),
-          if (auth is AuthSignedIn)
-            Padding(
-              padding: const EdgeInsets.only(right: 16, left: 8),
-              child: Center(
-                child: ConstrainedBox(
-                  // Who is signed in matters for accountability, but not more
-                  // than the screen's own name — the title keeps its room and
-                  // a long operator name ellipsizes instead.
-                  constraints: const BoxConstraints(maxWidth: 120),
-                  child: Text(
-                    auth.operator.nama,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: surfaces.textSecondary),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
       body: MaxWidth448(child: _Body()),
+    );
+  }
+}
+
+/// Who is signed in, and how current the numbers are.
+///
+/// This used to live in the app bar's `actions`, beside the demo badge, and
+/// that is where it broke the screen: at 320 px the title `Dashboard` was left
+/// 57 of the 96 px it needed and rendered as `Dashboa…`; at textScale 1.3 it
+/// got **15** of 124. An app bar gives its title whatever the actions do not
+/// take, so anything of variable width put there is a title truncated by
+/// however long somebody's name happens to be.
+///
+/// Down here the line has the full column width, the name no longer competes
+/// with the screen's own identity, and accountability is better served anyway
+/// — it reads as a sentence rather than as chrome.
+class _SignedInLine extends ConsumerWidget {
+  const _SignedInLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authProvider);
+    if (auth is! AuthSignedIn) return const SizedBox.shrink();
+
+    final type = FlowTypography.of(context);
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Masuk sebagai ${auth.operator.nama}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: type.caption,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -215,8 +232,15 @@ class _Body extends ConsumerWidget {
         if (banner != null) StaleBanner(message: banner, onRetry: retry),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: const EdgeInsets.fromLTRB(
+              FlowSpace.lg,
+              FlowSpace.md,
+              FlowSpace.lg,
+              FlowSpace.xxl,
+            ),
             children: [
+              const _SignedInLine(),
+              const SizedBox(height: FlowSpace.md),
               _SummaryCard(
                 summary: summarise([
                   for (final r in rows) (level: r.level, isStale: r.isStale),
@@ -248,10 +272,16 @@ class _Body extends ConsumerWidget {
   }
 }
 
-/// Four numbers in a row: macet, padat, lancar, tanpa data.
+/// Four numbers: macet, padat, lancar, tanpa data.
+///
+/// A wrapping two-column grid, not one row of four. Four cells across a 320 px
+/// screen leave 72 px each, and at textScale 1.3 that is a figure and a label
+/// fighting over the same space — which is the row the brief describes as cut
+/// off at the right edge. Two columns give each number room, and a fifth
+/// metric would move down rather than off the screen.
 ///
 /// The numbers are neutral ink, never the level colour. Colour on this screen
-/// belongs to the status pills alone — the console is denser than the citizen
+/// belongs to the status chips alone — the console is denser than the citizen
 /// app, which makes that rule easier to break and more important to hold.
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.summary});
@@ -260,8 +290,6 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-
     final cells = <(String, int)>[
       ('Macet', summary.macet),
       ('Padat', summary.padat),
@@ -269,68 +297,17 @@ class _SummaryCard extends StatelessWidget {
       ('Tanpa data', summary.tanpaData),
     ];
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: surfaces.card,
-        borderRadius: BorderRadius.circular(FlowRadius.card),
-        border: Border.all(color: surfaces.roadLine),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < cells.length; i++) ...[
-                if (i > 0) VerticalDivider(width: 1, color: surfaces.roadLine),
-                Expanded(
-                  child: _SummaryCell(
-                    label: cells[i].$1,
-                    value: cells[i].$2,
-                  ),
-                ),
-              ],
-            ],
+    return MetricGrid(
+      children: [
+        for (final (label, value) in cells)
+          MetricCard(
+            key: ValueKey('summary-$label'),
+            label: label,
+            value: '$value',
+            unit: 'simpang',
+            semanticsValue: '$label, $value simpang',
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryCell extends StatelessWidget {
-  const _SummaryCell({required this.label, required this.value});
-
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
-
-    return Semantics(
-      label: '$label, $value simpang',
-      excludeSemantics: true,
-      child: Padding(
-        key: ValueKey('summary-$label'),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$value',
-              style: text.displaySmall?.copyWith(color: surfaces.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
