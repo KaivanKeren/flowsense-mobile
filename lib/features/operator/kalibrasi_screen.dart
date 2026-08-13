@@ -12,8 +12,8 @@ import '../../domain/lane_label.dart';
 import '../../state/auth_providers.dart';
 import '../../state/calibration_providers.dart';
 import '../../state/providers.dart';
+import '../../widgets/widgets.dart';
 import '../common/feed_view.dart';
-import '../common/status_pill.dart';
 
 /// Setting the number every level in the app divides by.
 ///
@@ -120,8 +120,8 @@ class _KalibrasiScreenState extends ConsumerState<KalibrasiScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final config = ref.watch(appConfigProvider);
 
     // Watched, not merely read at save time. `authProvider` resolves the
@@ -151,63 +151,86 @@ class _KalibrasiScreenState extends ConsumerState<KalibrasiScreen> {
     final lastChanged = stored == null ? null : lastChangedLine(stored);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
+      // `Kalibrasi — Simpang DPRD` needed 293 px and was given 288 at
+      // textScale 1.3 on a 320 px screen, so it shipped as
+      // `Kalibrasi — Simpang DPR…`. The name is not chrome and does not
+      // belong in a bar sized by whatever is left over; it leads the body
+      // instead, where it can wrap.
       appBar: AppBar(
-        title: Text(
-          intersection == null
-              ? 'Kalibrasi'
-              : 'Kalibrasi — ${intersection.name}',
-        ),
+        title: const Text('Kalibrasi'),
+        titleSpacing: FlowSpace.lg,
       ),
-      body: intersection == null
-          ? const Center(child: CircularProgressIndicator())
-          : MaxWidth448(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    child: Text(
-                      'Kapasitas adalah jumlah kendaraan yang memenuhi lajur '
-                      'saat berhenti total.',
-                      style: text.bodyMedium
-                          ?.copyWith(color: surfaces.textSecondary),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.zero,
-                      children: [
-                        for (final lane in intersection.lanes)
-                          _LaneRow(
-                            lane: lane,
-                            count: record?.perLane[lane],
-                            controller: _controllerFor(
-                              lane,
-                              _storedCapacity(
-                                intersection,
-                                lane,
-                                config.laneCapacityDefault,
-                              ),
+      body: intersections == null
+          ? const SkeletonList(rows: 6)
+          : intersection == null
+              ? MessageState.error(
+                  title: 'Simpang tidak ditemukan',
+                  message: 'Kamera ${widget.cameraId} tidak ada dalam '
+                      'daftar simpang.',
+                  actionLabel: 'Kembali',
+                  onAction: () => Navigator.of(context).maybePop(),
+                )
+              : MaxWidth448(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          FlowSpace.lg,
+                          FlowSpace.md,
+                          FlowSpace.lg,
+                          FlowSpace.lg,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(intersection.name,
+                                style: type.sectionTitle),
+                            const SizedBox(height: FlowSpace.xs),
+                            Text(
+                              'Kapasitas adalah jumlah kendaraan yang '
+                              'memenuhi lajur saat berhenti total.',
+                              style: type.body
+                                  .copyWith(color: colors.textSecondary),
                             ),
-                            onChanged: () => setState(() {}),
-                          ),
-                      ],
-                    ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          padding: EdgeInsets.zero,
+                          children: [
+                            for (final lane in intersection.lanes)
+                              _LaneRow(
+                                lane: lane,
+                                count: record?.perLane[lane],
+                                controller: _controllerFor(
+                                  lane,
+                                  _storedCapacity(
+                                    intersection,
+                                    lane,
+                                    config.laneCapacityDefault,
+                                  ),
+                                ),
+                                onChanged: () => setState(() {}),
+                              ),
+                          ],
+                        ),
+                      ),
+                      _Footer(
+                        // Saving needs a signed-in operator to attribute it to,
+                        // so the button waits for the session rather than failing
+                        // on press.
+                        busy: _busy || auth is! AuthSignedIn,
+                        error: _error,
+                        lastChanged: lastChanged,
+                        onSave: () => _save(intersection),
+                        onCancel: () =>
+                            _reset(intersection, config.laneCapacityDefault),
+                      ),
+                    ],
                   ),
-                  _Footer(
-                    // Saving needs a signed-in operator to attribute it to,
-                    // so the button waits for the session rather than failing
-                    // on press.
-                    busy: _busy || auth is! AuthSignedIn,
-                    error: _error,
-                    lastChanged: lastChanged,
-                    onSave: () => _save(intersection),
-                    onCancel: () =>
-                        _reset(intersection, config.laneCapacityDefault),
-                  ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 }
@@ -231,8 +254,8 @@ class _LaneRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final error = capacityError(controller.text);
     final capacity = error == null ? int.parse(controller.text.trim()) : 0;
@@ -247,9 +270,12 @@ class _LaneRow extends StatelessWidget {
     return Container(
       key: ValueKey('capacity-$lane'),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: surfaces.roadLine)),
+        border: Border(bottom: BorderSide(color: colors.borderSubtle)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlowSpace.lg,
+        vertical: FlowSpace.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -259,21 +285,29 @@ class _LaneRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(laneLabel(lane), style: text.titleMedium),
-                    const SizedBox(height: 2),
+                    Text(laneLabel(lane), style: type.sectionTitle),
+                    const SizedBox(height: FlowSpace.xs),
                     Text(
                       count == null
                           ? 'belum ada data'
                           : 'sekarang $count kendaraan',
-                      style: text.bodySmall
-                          ?.copyWith(color: surfaces.textSecondary),
+                      style: type.caption
+                          .copyWith(color: colors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              StatusPill(level: level, isStale: false),
-              const SizedBox(width: 10),
+              const SizedBox(width: FlowSpace.sm),
+              // No icon: the row also carries the lane name and the number
+              // being edited, and at 320 px there is no room for a third
+              // voice. The word is still there — the chip never speaks in
+              // colour alone.
+              StatusChip.congestion(
+                level: level,
+                isStale: false,
+                showIcon: false,
+              ),
+              const SizedBox(width: FlowSpace.sm),
               SizedBox(
                 width: 64,
                 child: TextField(
@@ -282,26 +316,25 @@ class _LaneRow extends StatelessWidget {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   textAlign: TextAlign.center,
-                  style: text.titleMedium,
+                  style: type.sectionTitle,
                   decoration: InputDecoration(
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: FlowSpace.md),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(FlowRadius.control),
+                      borderRadius: BorderRadius.circular(FlowRadius.sm),
                       borderSide: BorderSide(
                         color: error == null
-                            ? surfaces.textPrimary
-                            : surfaces.errorInk,
+                            ? colors.borderStrong
+                            : colors.statusEmergency,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(FlowRadius.control),
+                      borderRadius: BorderRadius.circular(FlowRadius.sm),
                       borderSide: BorderSide(
                         color: error == null
-                            ? surfaces.textPrimary
-                            : surfaces.errorInk,
+                            ? colors.borderStrong
+                            : colors.statusEmergency,
                       ),
                     ),
                   ),
@@ -310,10 +343,10 @@ class _LaneRow extends StatelessWidget {
             ],
           ),
           if (error != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: FlowSpace.xs),
             Text(
               error,
-              style: text.bodySmall?.copyWith(color: surfaces.errorInk),
+              style: type.caption.copyWith(color: colors.statusEmergency),
             ),
           ],
         ],
@@ -339,27 +372,32 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: surfaces.page,
-        border: Border(top: BorderSide(color: surfaces.roadLine)),
+        color: colors.surfaceCanvas,
+        border: Border(top: BorderSide(color: colors.borderSubtle)),
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+            FlowSpace.lg,
+            FlowSpace.md,
+            FlowSpace.lg,
+            FlowSpace.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (error != null) ...[
                 Text(
                   error!,
-                  style: text.bodySmall?.copyWith(color: surfaces.errorInk),
+                  style: type.caption.copyWith(color: colors.statusEmergency),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: FlowSpace.sm),
               ],
               Row(
                 children: [
@@ -369,17 +407,17 @@ class _Footer extends StatelessWidget {
                       child: const Text('Batal'),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: FlowSpace.md),
                   Expanded(
                     child: FilledButton(
                       onPressed: busy ? null : onSave,
                       child: busy
                           ? SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: FlowIconSize.sm,
+                              height: FlowIconSize.sm,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: surfaces.card,
+                                color: colors.textOnAccent,
                               ),
                             )
                           : const Text('Simpan'),
@@ -388,11 +426,11 @@ class _Footer extends StatelessWidget {
                 ],
               ),
               if (lastChanged != null) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: FlowSpace.sm),
                 Text(
                   lastChanged!,
                   textAlign: TextAlign.center,
-                  style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+                  style: type.caption.copyWith(color: colors.textMuted),
                 ),
               ],
             ],

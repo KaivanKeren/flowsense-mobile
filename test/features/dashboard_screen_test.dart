@@ -10,7 +10,7 @@ import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
 import 'package:flowsense_mobile/domain/congestion.dart';
 import 'package:flowsense_mobile/domain/operator_alert.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
+import 'package:flowsense_mobile/widgets/status_chip.dart';
 import 'package:flowsense_mobile/features/operator/dashboard_screen.dart';
 import 'package:flowsense_mobile/features/operator/detail_screen.dart';
 import 'package:flowsense_mobile/state/alert_providers.dart';
@@ -172,10 +172,17 @@ void main() {
     testWidgets('counts the four states across the top', (tester) async {
       await _pump(tester);
 
+      // The metric labels are set in the console's monospace capitals, so the
+      // visible string is uppercase. The sentence-case original is what the
+      // screen reader hears — see the semantics test below — because TalkBack
+      // handed `TANPA DATA` may spell it out letter by letter.
+      expect(find.text('MACET'), findsOneWidget);
+      expect(find.text('PADAT'), findsOneWidget);
+      expect(find.text('LANCAR'), findsOneWidget);
+      expect(find.text('TANPA DATA'), findsOneWidget);
+
+      // The status chips beside each intersection keep sentence case.
       expect(find.text('Macet'), findsWidgets);
-      expect(find.text('Padat'), findsWidgets);
-      expect(find.text('Lancar'), findsWidgets);
-      expect(find.text('Tanpa data'), findsOneWidget);
 
       // 1 macet, 1 padat, 1 lancar, 1 stale.
       for (final label in ['Macet', 'Padat', 'Lancar', 'Tanpa data']) {
@@ -240,8 +247,10 @@ void main() {
       // watching.
       await _pump(tester, alerts: [_alert(id: '1', name: 'Simpang DPRD')]);
 
-      final alertY = tester.getTopLeft(find.text('Peringatan aktif')).dy;
-      final listY = tester.getTopLeft(find.text('Simpang')).dy;
+      // The console's section headings are set in monospace capitals, so the
+      // strings on screen are uppercase.
+      final alertY = tester.getTopLeft(find.text('PERINGATAN AKTIF')).dy;
+      final listY = tester.getTopLeft(find.text('SIMPANG')).dy;
       expect(alertY, lessThan(listY));
     });
 
@@ -384,7 +393,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DetailScreen), findsOneWidget);
-      expect(find.text('Per lajur'), findsOneWidget);
+      expect(find.text('PER LAJUR'), findsOneWidget);
     });
 
     testWidgets('every row carries a status pill with words on it',
@@ -392,8 +401,10 @@ void main() {
       await _pump(tester);
 
       // Never colour alone — red-green colour blindness is exactly the
-      // relevant case for a traffic console.
-      expect(find.byType(StatusPill), findsNWidgets(4));
+      // relevant case for a traffic console. `StatusChip` renders the word
+      // and, unless a caller turns it off, a glyph whose shape differs from
+      // every other status.
+      expect(find.byType(StatusChip), findsNWidgets(4));
     });
   });
 

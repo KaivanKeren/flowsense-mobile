@@ -11,10 +11,9 @@ import '../../data/repository/traffic_repository.dart';
 import '../../domain/congestion.dart';
 import '../../domain/geo.dart';
 import '../../state/providers.dart';
-import '../common/failure_state.dart';
+import '../../widgets/widgets.dart';
 import '../common/feed_view.dart';
-import '../common/stale_banner.dart';
-import '../common/status_pill.dart';
+import '../common/relative_time.dart';
 import '../detail/intersection_sheet.dart';
 
 /// How the list is ordered.
@@ -49,7 +48,7 @@ class _SimpangScreenState extends ConsumerState<SimpangScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     final intersections = ref.watch(intersectionsProvider).valueOrNull;
     final state = ref.watch(snapshotProvider).valueOrNull;
     final config = ref.watch(appConfigProvider);
@@ -57,26 +56,32 @@ class _SimpangScreenState extends ConsumerState<SimpangScreen> {
     final here = ref.watch(deviceLocationProvider).valueOrNull;
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
       appBar: AppBar(
         title: const Text('Simpang'),
+        titleSpacing: FlowSpace.lg,
         actions: [if (ref.watch(isDemoProvider)) const DemoBadge()],
       ),
       body: MaxWidth448(
         child: Builder(builder: (context) {
           if (intersections == null || state == null || state is RepoLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonList(rows: 6);
           }
 
           final FeedView(:snapshot, :banner) = FeedView.of(state, now);
           if (snapshot == null) {
-            return FailureState.noConnection(
-              lastDataText: 'Belum ada data tersimpan',
-              onRetry: _retry,
+            return MessageState.error(
+              message: 'Tidak ada koneksi. Belum ada data tersimpan.',
+              actionLabel: 'Coba lagi',
+              onAction: _retry,
             );
           }
           if (snapshot.records.isEmpty) {
-            return FailureState.noData(onRetry: _retry);
+            return MessageState.empty(
+              message: 'Belum ada data masuk dari simpang mana pun.',
+              actionLabel: 'Coba lagi',
+              onAction: _retry,
+            );
           }
 
           final rows = [
@@ -102,7 +107,7 @@ class _SimpangScreenState extends ConsumerState<SimpangScreen> {
           return Column(
             children: [
               if (banner != null)
-                StaleBanner(message: banner, onRetry: _retry),
+                StaleNotice(message: banner, onRetry: _retry),
               _SortTabs(
                 sort: _sort,
                 // With no fix there is nothing to measure from, so the option
@@ -115,7 +120,7 @@ class _SimpangScreenState extends ConsumerState<SimpangScreen> {
                   padding: EdgeInsets.zero,
                   itemCount: rows.length,
                   separatorBuilder: (_, _) =>
-                      Divider(color: surfaces.roadLine, height: 1),
+                      Divider(color: colors.borderSubtle, height: 1),
                   itemBuilder: (context, i) => _IntersectionRow(
                     row: rows[i],
                     now: now,
@@ -235,8 +240,8 @@ class _SortTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final options = [
       SimpangSort.terparah,
@@ -245,7 +250,7 @@ class _SortTabs extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: surfaces.roadLine)),
+        border: Border(bottom: BorderSide(color: colors.borderSubtle)),
       ),
       child: Row(
         children: [
@@ -260,13 +265,14 @@ class _SortTabs extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   onTap: () => onChanged(option),
                   child: Container(
-                    constraints: const BoxConstraints(minHeight: 44),
+                    constraints:
+                        const BoxConstraints(minHeight: FlowTouch.minTarget),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
                           color: sort == option
-                              ? surfaces.textPrimary
+                              ? colors.textPrimary
                               : Colors.transparent,
                           width: 2,
                         ),
@@ -274,10 +280,10 @@ class _SortTabs extends StatelessWidget {
                     ),
                     child: Text(
                       option.label,
-                      style: text.bodyMedium?.copyWith(
+                      style: type.body.copyWith(
                         color: sort == option
-                            ? surfaces.textPrimary
-                            : surfaces.textSecondary,
+                            ? colors.textPrimary
+                            : colors.textSecondary,
                       ),
                     ),
                   ),
@@ -305,8 +311,8 @@ class _IntersectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final facts = <String>[
       if (row.record != null) '${row.vehicles} kendaraan',
@@ -328,25 +334,34 @@ class _IntersectionRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(
+            horizontal: FlowSpace.lg,
+            vertical: FlowSpace.md,
+          ),
           child: Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(row.intersection.name, style: text.titleMedium),
-                    const SizedBox(height: 2),
+                    Text(row.intersection.name, style: type.sectionTitle),
+                    const SizedBox(height: FlowSpace.xs),
                     Text(
                       facts.join(' · '),
-                      style: text.bodyMedium
-                          ?.copyWith(color: surfaces.textSecondary),
+                      style: type.caption
+                          .copyWith(color: colors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              StatusPill(level: row.level, isStale: row.isStale),
+              const SizedBox(width: FlowSpace.md),
+              // No prefix: the row's own Semantics already says which
+              // intersection this is.
+              StatusChip.congestion(
+                level: row.level,
+                isStale: row.isStale,
+                semanticsPrefix: null,
+              ),
             ],
           ),
         ),

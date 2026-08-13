@@ -9,6 +9,7 @@ import '../../domain/app_mode.dart';
 import '../../domain/subscription.dart';
 import '../../state/app_mode_providers.dart';
 import '../../state/providers.dart';
+import '../../widgets/widgets.dart';
 import '../tentang/tentang_screen.dart';
 
 /// Which intersections are worth being interrupted for, and when.
@@ -20,23 +21,28 @@ class LanggananScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     final settings = ref.watch(subscriptionProvider);
     final intersections = ref.watch(intersectionsProvider).valueOrNull;
 
     return Scaffold(
-      backgroundColor: surfaces.page,
-      appBar: AppBar(title: const Text('Langganan')),
+      backgroundColor: colors.surfaceCanvas,
+      appBar: AppBar(title: const Text('Notifikasi'), titleSpacing: FlowSpace.lg),
       body: MaxWidth448(
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.only(bottom: FlowSpace.xl),
           children: [
-            _SectionLabel('Simpang yang dipantau'),
+            const SectionHeader(
+              title: 'Simpang yang dipantau',
+              padding: EdgeInsets.fromLTRB(
+                FlowSpace.lg,
+                FlowSpace.xl,
+                FlowSpace.lg,
+                FlowSpace.sm,
+              ),
+            ),
             if (intersections == null)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const SkeletonList(rows: 3)
             else
               for (final intersection in intersections)
                 _SwitchRow(
@@ -49,7 +55,15 @@ class LanggananScreen extends ConsumerWidget {
                   ),
                 ),
 
-            _SectionLabel('Beri tahu saat'),
+            const SectionHeader(
+              title: 'Beri tahu saat',
+              padding: EdgeInsets.fromLTRB(
+                FlowSpace.lg,
+                FlowSpace.xl,
+                FlowSpace.lg,
+                FlowSpace.sm,
+              ),
+            ),
             for (final threshold in AlertThreshold.values)
               _RadioRow(
                 label: _thresholdLabel(threshold),
@@ -61,7 +75,15 @@ class LanggananScreen extends ConsumerWidget {
                 ),
               ),
 
-            _SectionLabel('Jam aktif'),
+            const SectionHeader(
+              title: 'Jam aktif',
+              padding: EdgeInsets.fromLTRB(
+                FlowSpace.lg,
+                FlowSpace.xl,
+                FlowSpace.lg,
+                FlowSpace.sm,
+              ),
+            ),
             for (var i = 0; i < settings.activeHours.length; i++)
               _RangeRow(
                 index: i,
@@ -77,18 +99,22 @@ class LanggananScreen extends ConsumerWidget {
               onTap: () => _editRange(context, ref, settings, null),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.fromLTRB(
+                FlowSpace.lg,
+                FlowSpace.sm,
+                FlowSpace.lg,
+                0,
+              ),
               child: Text(
                 'Di luar jam ini, notifikasi tidak dikirim.',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: surfaces.textFaint),
+                style: FlowTypography.of(context)
+                    .caption
+                    .copyWith(color: colors.textMuted),
               ),
             ),
 
-            const SizedBox(height: 20),
-            Divider(color: surfaces.roadLine, height: 1),
+            const SizedBox(height: FlowSpace.xl),
+            Divider(color: colors.borderSubtle, height: 1),
             _LinkRow(
               label: 'Tentang dan sumber data',
               onTap: () => unawaited(Navigator.of(context).push(
@@ -169,27 +195,6 @@ class LanggananScreen extends ConsumerWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        text,
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: surfaces.textSecondary),
-      ),
-    );
-  }
-}
-
 /// Rows never fix their height: they size to their content so a large
 /// `textScaler` grows them instead of clipping the label.
 class _Row extends StatelessWidget {
@@ -200,16 +205,19 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: surfaces.roadLine)),
+        border: Border(bottom: BorderSide(color: colors.borderSubtle)),
       ),
       child: InkWell(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          constraints: const BoxConstraints(minHeight: FlowTouch.minTarget),
+          padding: const EdgeInsets.symmetric(
+            horizontal: FlowSpace.lg,
+            vertical: FlowSpace.md,
+          ),
           child: child,
         ),
       ),
@@ -235,7 +243,7 @@ class _SwitchRow extends StatelessWidget {
           children: [
             Expanded(
               child: Text(label,
-                  style: Theme.of(context).textTheme.titleMedium),
+                  style: FlowTypography.of(context).sectionTitle),
             ),
             Switch(value: value, onChanged: onChanged),
           ],
@@ -256,7 +264,7 @@ class _RadioRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     return _Row(
       onTap: onTap,
       child: Semantics(
@@ -270,13 +278,13 @@ class _RadioRow extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked
                   : Icons.radio_button_unchecked,
-              size: 20,
-              color: selected ? surfaces.textPrimary : surfaces.faintInk,
+              size: FlowIconSize.md,
+              color: selected ? colors.textPrimary : colors.statusUnknown,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: FlowSpace.md),
             Expanded(
-              child:
-                  Text(label, style: Theme.of(context).textTheme.titleMedium),
+              child: Text(label,
+                  style: FlowTypography.of(context).sectionTitle),
             ),
           ],
         ),
@@ -300,19 +308,19 @@ class _RangeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     return _Row(
       onTap: onEdit,
       child: Row(
         children: [
           Expanded(
-            child: Text('Rentang ${index + 1}', style: text.titleMedium),
+            child: Text('Rentang ${index + 1}', style: type.sectionTitle),
           ),
-          Text(range.label, style: text.titleMedium),
-          const SizedBox(width: 4),
+          Text(range.label, style: type.sectionTitle),
+          const SizedBox(width: FlowSpace.xs),
           IconButton(
             onPressed: onRemove,
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(Icons.close, size: FlowIconSize.sm),
             tooltip: 'Hapus rentang',
           ),
         ],
@@ -331,10 +339,10 @@ class _AddRangeRow extends StatelessWidget {
         onTap: onTap,
         child: Row(
           children: [
-            const Icon(Icons.add, size: 18),
-            const SizedBox(width: 12),
+            const Icon(Icons.add, size: FlowIconSize.md),
+            const SizedBox(width: FlowSpace.md),
             Text('Tambah rentang waktu',
-                style: Theme.of(context).textTheme.titleMedium),
+                style: FlowTypography.of(context).sectionTitle),
           ],
         ),
       );
@@ -360,14 +368,14 @@ class _LinkRow extends StatelessWidget {
         child: Row(
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20),
-              const SizedBox(width: 12),
+              Icon(icon, size: FlowIconSize.md),
+              const SizedBox(width: FlowSpace.md),
             ],
             Expanded(
-              child:
-                  Text(label, style: Theme.of(context).textTheme.titleMedium),
+              child: Text(label,
+                  style: FlowTypography.of(context).sectionTitle),
             ),
-            const Icon(Icons.chevron_right, size: 20),
+            const Icon(Icons.chevron_right, size: FlowIconSize.md),
           ],
         ),
       );

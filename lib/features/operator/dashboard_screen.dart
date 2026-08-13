@@ -16,10 +16,9 @@ import '../../domain/status_summary.dart';
 import '../../state/alert_providers.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
-import '../common/failure_state.dart';
+import '../../widgets/widgets.dart';
 import '../common/feed_view.dart';
-import '../common/stale_banner.dart';
-import '../common/status_pill.dart';
+import '../common/relative_time.dart';
 import 'detail_screen.dart';
 
 /// One intersection as the operator list sees it.
@@ -134,41 +133,20 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
-    final auth = ref.watch(authProvider);
+    final colors = AppColors.of(context);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
       appBar: AppBar(
         // The layout doc names the route but not the title; the reference
         // image labels it `Dashboard`, so the image stands.
         title: const Text('Dashboard'),
-        titleSpacing: 16,
+        titleSpacing: FlowSpace.lg,
         actions: [
           // Says the numbers are bundled fixtures rather than live traffic.
           // Never dropped to make room for chrome: degrading to fixtures keeps
           // a demo alive, doing it silently passes canned data off as real.
           if (ref.watch(isDemoProvider)) const DemoBadge(),
-          if (auth is AuthSignedIn)
-            Padding(
-              padding: const EdgeInsets.only(right: 16, left: 8),
-              child: Center(
-                child: ConstrainedBox(
-                  // Who is signed in matters for accountability, but not more
-                  // than the screen's own name — the title keeps its room and
-                  // a long operator name ellipsizes instead.
-                  constraints: const BoxConstraints(maxWidth: 120),
-                  child: Text(
-                    auth.operator.nama,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: surfaces.textSecondary),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
       body: MaxWidth448(child: _Body()),
@@ -176,10 +154,40 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+/// Who is signed in, and how current the numbers are.
+///
+/// This used to live in the app bar's `actions`, beside the demo badge, and
+/// that is where it broke the screen: at 320 px the title `Dashboard` was left
+/// 57 of the 96 px it needed and rendered as `Dashboa…`; at textScale 1.3 it
+/// got **15** of 124. An app bar gives its title whatever the actions do not
+/// take, so anything of variable width put there is a title truncated by
+/// however long somebody's name happens to be.
+///
+/// Down here the line has the full column width, the name no longer competes
+/// with the screen's own identity, and accountability is better served anyway
+/// — it reads as a sentence rather than as chrome.
+class _SignedInLine extends ConsumerWidget {
+  const _SignedInLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authProvider);
+    if (auth is! AuthSignedIn) return const SizedBox.shrink();
+
+    return Text(
+      'Masuk sebagai ${auth.operator.nama}',
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: FlowTypography.of(context).caption,
+    );
+  }
+}
+
 class _Body extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final intersections = ref.watch(intersectionsProvider).valueOrNull;
     final state = ref.watch(snapshotProvider).valueOrNull;
     final config = ref.watch(appConfigProvider);
@@ -187,19 +195,32 @@ class _Body extends ConsumerWidget {
 
     void retry() => unawaited(ref.read(repositoryProvider).poll());
 
+    // Loading. A skeleton in the shape of the summary grid and the list, so
+    // the page says what is coming and does not jump when it lands.
     if (intersections == null || state == null || state is RepoLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonList(rows: 5);
     }
 
     final FeedView(:snapshot, :banner) = FeedView.of(state, now);
+
+    // Error: nothing cached, nothing reachable.
     if (snapshot == null) {
-      return FailureState.noConnection(
-        lastDataText: 'Belum ada data tersimpan',
-        onRetry: retry,
+      return MessageState.error(
+        title: 'Tidak ada koneksi',
+        message: 'Belum ada data tersimpan di perangkat ini.',
+        actionLabel: 'Coba lagi',
+        onAction: retry,
       );
     }
+
+    // Empty: reachable, but no intersection has ever reported.
     if (snapshot.records.isEmpty) {
-      return FailureState.noData(onRetry: retry);
+      return MessageState.empty(
+        title: 'Belum ada data',
+        message: 'Belum ada data masuk dari simpang mana pun.',
+        actionLabel: 'Coba lagi',
+        onAction: retry,
+      );
     }
 
     final rows = rankWorstFirst(
@@ -210,35 +231,46 @@ class _Body extends ConsumerWidget {
       laneCapacityDefault: config.laneCapacityDefault,
     );
 
+    final newest = snapshot.records
+        .map((r) => r.ts)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+
     return Column(
       children: [
-        if (banner != null) StaleBanner(message: banner, onRetry: retry),
+        // Stale: the last good data keeps rendering underneath. A failed poll
+        // must never empty the screen; it only ever adds this strip.
+        if (banner != null) StaleNotice(message: banner, onRetry: retry),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: const EdgeInsets.fromLTRB(
+              FlowSpace.lg,
+              FlowSpace.md,
+              FlowSpace.lg,
+              FlowSpace.xxl,
+            ),
             children: [
+              _ScreenHeader(age: now.difference(newest), isStale: banner != null),
+              const SizedBox(height: FlowSpace.md),
               _SummaryCard(
                 summary: summarise([
                   for (final r in rows) (level: r.level, isStale: r.isStale),
                 ]),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: FlowSpace.xl),
               const _AlertsSection(),
-              const SizedBox(height: 24),
-              _SectionHeader(
+              const SizedBox(height: FlowSpace.xl),
+              const SectionHeader(
                 title: 'Simpang',
-                trailing: 'urut terparah dulu',
+                mono: true,
+                trailing: Text('urut terparah dulu'),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: FlowSpace.sm),
               _IntersectionCard(rows: rows, now: now),
-              const SizedBox(height: 8),
+              const SizedBox(height: FlowSpace.sm),
               Text(
                 'Konsol ini hanya membaca. Tidak ada kendali lampu lalu '
                 'lintas.',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: surfaces.textFaint),
+                style: type.caption.copyWith(color: colors.textMuted),
               ),
             ],
           ),
@@ -248,10 +280,36 @@ class _Body extends ConsumerWidget {
   }
 }
 
-/// Four numbers in a row: macet, padat, lancar, tanpa data.
+/// Who is looking, and how current what they are looking at is.
+class _ScreenHeader extends StatelessWidget {
+  const _ScreenHeader({required this.age, required this.isStale});
+
+  final Duration age;
+  final bool isStale;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: FlowSpace.md,
+        runSpacing: FlowSpace.xs,
+        children: [
+          const _SignedInLine(),
+          LiveIndicator(age: age, isStale: isStale),
+        ],
+      );
+}
+
+/// Four numbers: macet, padat, lancar, tanpa data.
+///
+/// A wrapping two-column grid, not one row of four. Four cells across a 320 px
+/// screen leave 72 px each, and at textScale 1.3 that is a figure and a label
+/// fighting over the same space — which is the row the brief describes as cut
+/// off at the right edge. Two columns give each number room, and a fifth
+/// metric would move down rather than off the screen.
 ///
 /// The numbers are neutral ink, never the level colour. Colour on this screen
-/// belongs to the status pills alone — the console is denser than the citizen
+/// belongs to the status chips alone — the console is denser than the citizen
 /// app, which makes that rule easier to break and more important to hold.
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.summary});
@@ -260,8 +318,6 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-
     final cells = <(String, int)>[
       ('Macet', summary.macet),
       ('Padat', summary.padat),
@@ -269,95 +325,15 @@ class _SummaryCard extends StatelessWidget {
       ('Tanpa data', summary.tanpaData),
     ];
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: surfaces.card,
-        borderRadius: BorderRadius.circular(FlowRadius.card),
-        border: Border.all(color: surfaces.roadLine),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < cells.length; i++) ...[
-                if (i > 0) VerticalDivider(width: 1, color: surfaces.roadLine),
-                Expanded(
-                  child: _SummaryCell(
-                    label: cells[i].$1,
-                    value: cells[i].$2,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryCell extends StatelessWidget {
-  const _SummaryCell({required this.label, required this.value});
-
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
-
-    return Semantics(
-      label: '$label, $value simpang',
-      excludeSemantics: true,
-      child: Padding(
-        key: ValueKey('summary-$label'),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$value',
-              style: text.displaySmall?.copyWith(color: surfaces.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.trailing});
-
-  final String title;
-  final String? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
-
-    return Row(
+    return MetricGrid(
       children: [
-        Expanded(
-          child: Text(
-            title,
-            style: text.bodyMedium?.copyWith(color: surfaces.textSecondary),
-          ),
-        ),
-        if (trailing != null)
-          Text(
-            trailing!,
-            style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+        for (final (label, value) in cells)
+          MetricCard(
+            key: ValueKey('summary-$label'),
+            label: label,
+            value: '$value',
+            unit: 'simpang',
+            semanticsValue: '$label, $value simpang',
           ),
       ],
     );
@@ -369,8 +345,8 @@ class _AlertsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final now = ref.watch(clockProvider).now();
     final alerts = ref.watch(operatorAlertsProvider);
 
@@ -381,29 +357,29 @@ class _AlertsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeader(title: 'Peringatan aktif'),
-        const SizedBox(height: 8),
+        const SectionHeader(title: 'Peringatan aktif', mono: true),
+        const SizedBox(height: FlowSpace.sm),
         if (active.isEmpty)
           // A sentence saying it is empty, not an empty section.
           Text(
             'Tidak ada peringatan aktif',
-            style: text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+            style: type.body.copyWith(color: colors.textSecondary),
           )
         else
           for (final alert in active)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: FlowSpace.sm),
               child: _AlertCard(alert: alert, now: now),
             ),
         // Acknowledged alerts stay on the page. Their history is the
         // accountability the console exists to provide.
         for (final alert in acknowledged)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: FlowSpace.sm),
             child: Text(
               '${alert.name} · diakui ${alert.acknowledgedBy} '
               '${clockTime(alert.acknowledgedAt!)}',
-              style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+              style: type.caption.copyWith(color: colors.textMuted),
             ),
           ),
       ],
@@ -445,61 +421,63 @@ class _AlertCardState extends ConsumerState<_AlertCard> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final alert = widget.alert;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: surfaces.card,
-        borderRadius: BorderRadius.circular(FlowRadius.card),
-        border: Border.all(color: surfaces.roadLine),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
+    final summary = '${alert.level.label} sejak '
+        '${clockTime(alert.raisedAt)} · '
+        '${durationIndonesian(alert.age(widget.now))}';
+
+    return AppCard(
+      padding: const EdgeInsets.all(FlowSpace.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Semantics(
+                  label: '${alert.name}, $summary',
+                  excludeSemantics: true,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(alert.name, style: text.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${alert.level.label} sejak '
-                        '${clockTime(alert.raisedAt)} · '
-                        '${durationIndonesian(alert.age(widget.now))}',
-                        style: text.bodyMedium
-                            ?.copyWith(color: surfaces.textSecondary),
-                      ),
+                      Text(alert.name, style: type.sectionTitle),
+                      const SizedBox(height: FlowSpace.xs),
+                      Text(summary, style: type.metricUnit),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: _busy ? null : _acknowledge,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Akui'),
-                ),
-              ],
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: text.bodySmall?.copyWith(color: surfaces.errorInk),
+              ),
+              const SizedBox(width: FlowSpace.md),
+              OutlinedButton(
+                onPressed: _busy ? null : _acknowledge,
+                child: _busy
+                    ? SizedBox(
+                        width: FlowIconSize.sm,
+                        height: FlowIconSize.sm,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colors.textPrimary,
+                        ),
+                      )
+                    : const Text('Akui'),
               ),
             ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: FlowSpace.sm),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _error!,
+                style: type.caption.copyWith(color: colors.statusEmergency),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -513,18 +491,16 @@ class _IntersectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: surfaces.card,
-        borderRadius: BorderRadius.circular(FlowRadius.card),
-        border: Border.all(color: surfaces.roadLine),
-      ),
+    return AppCard(
+      // Zero, because the rows draw their own padding and the dividers have to
+      // run the full width of the card.
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: surfaces.roadLine),
+            if (i > 0) Divider(height: 1, color: colors.borderSubtle),
             _IntersectionRow(
               status: rows[i],
               now: now,
@@ -545,8 +521,9 @@ class _IntersectionCard extends StatelessWidget {
 /// Two tiers: identity on the first line, the supporting numbers on the second
 /// as secondary text separated by middots.
 ///
-/// This is what a wide desktop table becomes on a 360 px phone. Minimum height
-/// 56 so the touch target still clears 44 even when both lines are short.
+/// This is what a wide desktop table becomes on a 360 px phone. The minimum
+/// height keeps the touch target above the 48 dp floor even when both lines
+/// are short.
 class _IntersectionRow extends StatelessWidget {
   const _IntersectionRow({
     required this.status,
@@ -560,8 +537,8 @@ class _IntersectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final record = status.record;
 
     final facts = status.isStale
@@ -577,8 +554,11 @@ class _IntersectionRow extends StatelessWidget {
 
     final row = Container(
       key: ValueKey('row-${status.intersection.id}'),
-      constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: const BoxConstraints(minHeight: FlowTouch.minTarget),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlowSpace.md,
+        vertical: FlowSpace.md,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -591,29 +571,32 @@ class _IntersectionRow extends StatelessWidget {
                     Flexible(
                       child: Text(
                         status.intersection.name,
-                        style: text.titleMedium,
+                        style: type.sectionTitle,
                       ),
                     ),
                     if (status.isStale) ...[
-                      const SizedBox(width: 8),
-                      // Shown only when something is wrong, and in the error
-                      // ink rather than the congestion red — those four hues
-                      // mean congestion and nothing else.
-                      _HealthDot(color: surfaces.errorInk),
+                      const SizedBox(width: FlowSpace.sm),
+                      // Shown only when something is wrong, and in the
+                      // emergency ink rather than the congestion red — those
+                      // four hues mean congestion and nothing else.
+                      _HealthDot(color: colors.statusEmergency),
                     ],
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  facts,
-                  style:
-                      text.bodySmall?.copyWith(color: surfaces.textSecondary),
-                ),
+                const SizedBox(height: FlowSpace.xs),
+                Text(facts, style: type.caption),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          StatusPill(level: status.level, isStale: status.isStale),
+          const SizedBox(width: FlowSpace.md),
+          // No prefix: the row's own Semantics already says which intersection
+          // this is, and repeating it would have a screen reader announce the
+          // name twice.
+          StatusChip.congestion(
+            level: status.level,
+            isStale: status.isStale,
+            semanticsPrefix: null,
+          ),
         ],
       ),
     );
@@ -643,8 +626,8 @@ class _HealthDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 8,
-        height: 8,
+        width: FlowSpace.sm,
+        height: FlowSpace.sm,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       );
 }

@@ -14,9 +14,8 @@ import '../../data/models/traffic_snapshot.dart';
 import '../../data/repository/traffic_repository.dart';
 import '../../domain/congestion.dart';
 import '../../state/providers.dart';
-import '../common/failure_state.dart';
+import '../../widgets/widgets.dart';
 import '../common/feed_view.dart';
-import '../common/stale_banner.dart';
 import '../detail/intersection_sheet.dart';
 import 'intersection_marker.dart';
 
@@ -44,7 +43,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     final intersections = ref.watch(intersectionsProvider).valueOrNull;
     final state = ref.watch(snapshotProvider).valueOrNull;
     final config = ref.watch(appConfigProvider);
@@ -52,7 +51,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final selectedId = ref.watch(selectedIntersectionProvider);
 
     return Scaffold(
-      backgroundColor: surfaces.map,
+      backgroundColor: colors.surfaceElevated,
       body: MaxWidth448(
         child: SafeArea(
           bottom: false,
@@ -79,13 +78,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final FeedView(:snapshot, :banner) = FeedView.of(state, now);
 
     if (snapshot == null) {
-      return FailureState.noConnection(
-        lastDataText: 'Belum ada data tersimpan',
-        onRetry: _retry,
+      return MessageState.error(
+        message: 'Tidak ada koneksi. Belum ada data tersimpan.',
+        actionLabel: 'Coba lagi',
+        onAction: _retry,
       );
     }
     if (snapshot.records.isEmpty) {
-      return FailureState.noData(onRetry: _retry);
+      return MessageState.empty(
+        message: 'Belum ada data masuk dari simpang mana pun.',
+        actionLabel: 'Coba lagi',
+        onAction: _retry,
+      );
     }
 
     final staleAfter = config.staleAfter;
@@ -125,9 +129,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ),
         Positioned(
-          top: 8,
-          left: 12,
-          right: 12,
+          top: FlowSpace.sm,
+          left: FlowSpace.md,
+          right: FlowSpace.md,
           child: _SearchField(
             onChanged: (value) => setState(() => _query = value),
             onSubmitted: (_) {
@@ -144,17 +148,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         // are canned, and a demo that hid either would be passing fixtures
         // off as live traffic.
         Positioned(
+          // Measured, not chosen: the search field's `top: FlowSpace.sm` plus
+          // its rendered height plus a small gap. This is a map overlay
+          // coordinate, not a spacing decision.
           top: 62,
-          left: 12,
-          right: 12,
+          left: FlowSpace.md,
+          right: FlowSpace.md,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (ref.watch(isDemoProvider)) const DemoBadge(),
               if (banner != null)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(FlowRadius.card),
-                  child: StaleBanner(message: banner, onRetry: _retry),
+                  borderRadius: BorderRadius.circular(FlowRadius.md),
+                  child: StaleNotice(message: banner, onRetry: _retry),
                 ),
             ],
           ),
@@ -257,21 +264,23 @@ class _FirstLoad extends StatelessWidget {
   const _FirstLoad();
 
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(height: 14),
-            Text('Memuat data simpang',
-                style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final type = FlowTypography.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: FlowIconSize.md,
+            height: FlowIconSize.md,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(height: FlowSpace.md),
+          Text('Memuat data simpang', style: type.body),
+        ],
+      ),
+    );
+  }
 }
 
 class _SearchField extends StatelessWidget {
@@ -282,33 +291,36 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     return Material(
-      color: surfaces.card,
+      color: colors.surfaceCard,
       elevation: 0,
-      borderRadius: BorderRadius.circular(FlowRadius.card),
+      borderRadius: BorderRadius.circular(FlowRadius.md),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(FlowRadius.card),
-          border: Border.all(color: surfaces.roadLine),
+          borderRadius: BorderRadius.circular(FlowRadius.md),
+          border: Border.all(color: colors.borderSubtle),
         ),
         child: TextField(
           onChanged: onChanged,
           onSubmitted: onSubmitted,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: type.body,
           decoration: InputDecoration(
             hintText: 'Cari simpang',
-            hintStyle: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: surfaces.textSecondary),
-            prefixIcon:
-                Icon(Icons.search, size: 20, color: surfaces.textSecondary),
+            hintStyle: type.body.copyWith(color: colors.textSecondary),
+            prefixIcon: Icon(
+              Icons.search,
+              size: FlowIconSize.md,
+              color: colors.textSecondary,
+            ),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: FlowSpace.md,
+              vertical: FlowSpace.lg,
+            ),
             isDense: true,
           ),
         ),
@@ -326,18 +338,18 @@ class _SheetSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: surfaces.card,
+        color: colors.surfaceCard,
         borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(FlowRadius.sheet),
+          top: Radius.circular(FlowRadius.lg),
         ),
-        border: Border(top: BorderSide(color: surfaces.roadLine)),
+        border: Border(top: BorderSide(color: colors.borderSubtle)),
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(FlowRadius.sheet),
+          top: Radius.circular(FlowRadius.lg),
         ),
         child: child,
       ),

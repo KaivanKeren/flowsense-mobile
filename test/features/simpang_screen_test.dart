@@ -6,9 +6,9 @@ import 'package:flowsense_mobile/data/location/location_source.dart';
 import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
 import 'package:flowsense_mobile/features/simpang/simpang_screen.dart';
 import 'package:flowsense_mobile/state/providers.dart';
+import 'package:flowsense_mobile/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -147,9 +147,9 @@ void main() {
 
     expect(find.textContaining('9 kendaraan'), findsOneWidget);
     expect(find.textContaining('baru saja'), findsWidgets);
-    expect(find.widgetWithText(StatusPill, 'Macet'), findsOneWidget);
-    expect(find.widgetWithText(StatusPill, 'Padat'), findsOneWidget);
-    expect(find.widgetWithText(StatusPill, 'Lancar'), findsOneWidget);
+    expect(find.widgetWithText(StatusChip, 'Macet'), findsOneWidget);
+    expect(find.widgetWithText(StatusChip, 'Padat'), findsOneWidget);
+    expect(find.widgetWithText(StatusChip, 'Lancar'), findsOneWidget);
   });
 
   testWidgets('a stale row reads Data basi and says how old it is',
@@ -164,7 +164,7 @@ void main() {
       ]),
     );
 
-    expect(find.widgetWithText(StatusPill, 'Data basi'), findsOneWidget);
+    expect(find.widgetWithText(StatusChip, 'Data basi'), findsOneWidget);
     expect(find.textContaining('4 menit lalu'), findsOneWidget);
   });
 

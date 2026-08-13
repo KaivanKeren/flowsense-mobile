@@ -131,7 +131,7 @@ void main() {
     expect(WargaTab.values, hasLength(3));
     expect(find.text('peta'), findsOneWidget);
     expect(find.text('simpang'), findsOneWidget);
-    expect(find.text('langganan'), findsOneWidget);
+    expect(find.text('notifikasi'), findsOneWidget);
 
     // Both turned up as autofill in the design tool's output and are refused
     // on purpose: reports need moderation, and there is no account.
@@ -152,11 +152,11 @@ void main() {
   testWidgets('switches to subscriptions', (tester) async {
     await _pump(tester);
 
-    await tester.tap(find.text('langganan'));
+    await tester.tap(find.text('notifikasi'));
     await tester.pumpAndSettle();
 
     expect(find.byType(LanggananScreen), findsOneWidget);
-    expect(find.text('Langganan'), findsOneWidget);
+    expect(find.text('Notifikasi'), findsOneWidget);
   });
 
   testWidgets('keeps each tab alive, so the map does not reload',
@@ -186,7 +186,7 @@ void main() {
 
     await _pump(tester);
 
-    for (final tab in ['peta', 'simpang', 'langganan']) {
+    for (final tab in ['peta', 'simpang', 'notifikasi']) {
       await tester.tap(find.text(tab));
       await tester.pumpAndSettle();
 

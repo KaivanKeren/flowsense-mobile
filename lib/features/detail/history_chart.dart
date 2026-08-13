@@ -63,40 +63,40 @@ class _HistoryChartState extends State<HistoryChart> {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final surfaces = FlowSurfaces.of(context);
+    final type = FlowTypography.of(context);
+    final colors = AppColors.of(context);
     final summary = historySummary(widget.buckets);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('60 menit terakhir', style: text.titleMedium),
-        const SizedBox(height: 4),
+        Text('60 menit terakhir', style: type.sectionTitle),
+        const SizedBox(height: FlowSpace.xs),
         _Readout(bucket: _readout, lane: widget.selectedLane),
-        const SizedBox(height: 8),
+        const SizedBox(height: FlowSpace.sm),
         _Bars(
           buckets: widget.buckets,
           touched: _touched,
           onTouch: (i) => setState(() => _touched = i),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: FlowSpace.xs),
         _AxisLabels(labels: historyAxisLabels(widget.buckets)),
-        const SizedBox(height: 10),
+        const SizedBox(height: FlowSpace.sm),
         const _Legend(),
-        const SizedBox(height: 12),
+        const SizedBox(height: FlowSpace.md),
         _LaneChips(
           lanes: widget.lanes,
           selected: widget.selectedLane,
           onChanged: widget.onLaneChanged,
         ),
         if (summary.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Divider(color: surfaces.roadLine, height: 1),
-          const SizedBox(height: 12),
+          const SizedBox(height: FlowSpace.md),
+          Divider(color: colors.borderSubtle, height: 1),
+          const SizedBox(height: FlowSpace.md),
           for (final line in summary)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(line, style: text.bodyMedium),
+              padding: const EdgeInsets.only(bottom: FlowSpace.xs),
+              child: Text(line, style: type.body),
             ),
         ],
       ],
@@ -113,23 +113,23 @@ class _Readout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     final reading = bucket;
     final scope = lane == null ? 'semua arah' : laneLabel(lane!).toLowerCase();
 
     if (reading == null) {
-      return Text('Belum ada riwayat', style: text.bodyMedium);
+      return Text('Belum ada riwayat', style: type.body);
     }
     if (!reading.hasData) {
       return Text(
         'Pukul ${hourMinute(reading.minute)} · data tidak masuk',
-        style: text.bodyMedium,
+        style: type.body,
       );
     }
     return Text(
       'Pukul ${hourMinute(reading.minute)} · ${reading.count} kendaraan · '
       '${reading.level.label.toLowerCase()} · $scope',
-      style: text.bodyMedium,
+      style: type.body,
     );
   }
 }
@@ -147,8 +147,8 @@ class _Bars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final surfaces = FlowSurfaces.of(context);
+    final congestion = CongestionColors.of(context);
+    final colors = AppColors.of(context);
 
     if (buckets.isEmpty) {
       return SizedBox(
@@ -156,7 +156,7 @@ class _Bars extends StatelessWidget {
         child: Center(
           child: Text(
             'Belum ada riwayat untuk simpang ini',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: FlowTypography.of(context).caption,
           ),
         ),
       );
@@ -179,8 +179,8 @@ class _Bars extends StatelessWidget {
                   bucket: buckets[i],
                   peak: peak,
                   isTouched: touched == i,
+                  congestion: congestion,
                   colors: colors,
-                  surfaces: surfaces,
                   onTap: () => onTouch(i),
                 ),
               ),
@@ -196,16 +196,16 @@ class _Bar extends StatelessWidget {
     required this.bucket,
     required this.peak,
     required this.isTouched,
+    required this.congestion,
     required this.colors,
-    required this.surfaces,
     required this.onTap,
   });
 
   final HistoryBucket bucket;
   final int peak;
   final bool isTouched;
-  final CongestionColors colors;
-  final FlowSurfaces surfaces;
+  final CongestionColors congestion;
+  final AppColors colors;
   final VoidCallback onTap;
 
   @override
@@ -231,13 +231,13 @@ class _Bar extends StatelessWidget {
               height: height.toDouble(),
               decoration: BoxDecoration(
                 color: bucket.hasData
-                    ? colors.forLevel(bucket.level)
-                    : surfaces.faintInk,
+                    ? congestion.forLevel(bucket.level)
+                    : colors.statusUnknown,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(2),
                 ),
                 border: isTouched
-                    ? Border.all(color: surfaces.textPrimary, width: 1)
+                    ? Border.all(color: colors.textPrimary, width: 1)
                     : null,
               ),
             ),
@@ -256,7 +256,7 @@ class _AxisLabels extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (labels.length < 3) return const SizedBox.shrink();
-    final style = Theme.of(context).textTheme.bodySmall;
+    final style = FlowTypography.of(context).caption;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -275,31 +275,31 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final surfaces = FlowSurfaces.of(context);
-    final style = Theme.of(context).textTheme.bodySmall;
+    final congestion = CongestionColors.of(context);
+    final colors = AppColors.of(context);
+    final style = FlowTypography.of(context).caption;
 
     Widget entry(Color color, String label) => Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 7,
-              height: 7,
+              width: FlowSpace.sm - 1,
+              height: FlowSpace.sm - 1,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: FlowSpace.xs),
             Text(label, style: style),
           ],
         );
 
     return Wrap(
-      spacing: 14,
-      runSpacing: 4,
+      spacing: FlowSpace.md,
+      runSpacing: FlowSpace.xs,
       children: [
-        entry(colors.lancar, 'Lancar'),
-        entry(colors.padat, 'Padat'),
-        entry(colors.macet, 'Macet'),
-        entry(surfaces.faintInk, 'Data hilang'),
+        entry(congestion.lancar, 'Lancar'),
+        entry(congestion.padat, 'Padat'),
+        entry(congestion.macet, 'Macet'),
+        entry(colors.statusUnknown, 'Data hilang'),
       ],
     );
   }
@@ -318,31 +318,31 @@ class _LaneChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     Widget chip(String label, String? value) {
       final isSelected = selected == value;
       return Padding(
-        padding: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.only(right: FlowSpace.sm),
         child: GestureDetector(
           onTap: () => onChanged(value),
           child: Semantics(
             button: true,
             selected: isSelected,
             child: Container(
-              constraints: const BoxConstraints(minHeight: 44),
+              constraints: const BoxConstraints(minHeight: FlowTouch.minTarget),
               alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: FlowSpace.md),
               decoration: BoxDecoration(
-                color: isSelected ? surfaces.textPrimary : surfaces.card,
-                borderRadius: BorderRadius.circular(FlowRadius.control),
-                border: Border.all(color: surfaces.roadLine),
+                color: isSelected ? colors.textPrimary : colors.surfaceCard,
+                borderRadius: BorderRadius.circular(FlowRadius.sm),
+                border: Border.all(color: colors.borderSubtle),
               ),
               child: Text(
                 label,
-                style: text.bodyMedium?.copyWith(
-                  color: isSelected ? surfaces.card : surfaces.textPrimary,
+                style: type.body.copyWith(
+                  color: isSelected ? colors.surfaceCard : colors.textPrimary,
                 ),
               ),
             ),

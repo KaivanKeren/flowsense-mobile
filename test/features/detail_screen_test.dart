@@ -8,7 +8,7 @@ import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
 import 'package:flowsense_mobile/domain/video_panel_state.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
+import 'package:flowsense_mobile/widgets/status_chip.dart';
 import 'package:flowsense_mobile/features/operator/detail_screen.dart';
 import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
@@ -120,7 +120,7 @@ void main() {
       await _pump(tester);
 
       expect(find.text('Simpang DPRD'), findsOneWidget);
-      expect(find.widgetWithText(StatusPill, 'Macet'), findsOneWidget);
+      expect(find.widgetWithText(StatusChip, 'Macet'), findsOneWidget);
       expect(find.textContaining('18 kendaraan'), findsOneWidget);
       expect(find.textContaining('baru saja'), findsOneWidget);
     });
@@ -134,7 +134,11 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, 'Kalibrasi'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Kalibrasi — Simpang DPRD'), findsOneWidget);
+      // The screen names itself in the bar and the intersection in the body.
+      // Both used to be one app-bar title, which at 320 px and textScale 1.3
+      // was 5 px short of fitting and shipped as `Kalibrasi — Simpang DPR…`.
+      expect(find.text('Kalibrasi'), findsOneWidget);
+      expect(find.text('Simpang DPRD'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Simpan'), findsOneWidget);
     });
   });
@@ -174,7 +178,9 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      expect(find.text('Per lajur'), findsOneWidget);
+      // The console's section headings are set in monospace capitals, so the
+      // strings on screen are uppercase.
+      expect(find.text('PER LAJUR'), findsOneWidget);
       for (final lane in ['kota', 'ploso', 'demak', 'sekoe']) {
         expect(_laneRow(lane), findsOneWidget, reason: lane);
       }
@@ -247,7 +253,7 @@ void main() {
       await _pump(tester, record: _record({}));
 
       expect(find.text('Tidak ada rincian lajur.'), findsOneWidget);
-      expect(find.widgetWithText(StatusPill, 'Lancar'), findsNothing);
+      expect(find.widgetWithText(StatusChip, 'Lancar'), findsNothing);
     });
   });
 
@@ -264,7 +270,7 @@ void main() {
     testWidgets('draws 96 bars, one per quarter hour', (tester) async {
       await _pump(tester);
 
-      expect(find.text('Riwayat 24 jam'), findsOneWidget);
+      expect(find.text('RIWAYAT 24 JAM'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('history-bars')),
         findsOneWidget,
@@ -284,6 +290,11 @@ void main() {
         of: find.byKey(const ValueKey('history-bars')),
         matching: find.byType(GestureDetector),
       );
+      // Scrolled into view first: the chart sits below the fold on the default
+      // test viewport now that `Kalibrasi` is a header button rather than an
+      // app-bar action. A tap that misses reports a warning, not a failure.
+      await tester.ensureVisible(bars.first);
+      await tester.pumpAndSettle();
       await tester.tap(bars.first);
       await tester.pumpAndSettle();
 
@@ -301,6 +312,8 @@ void main() {
         of: find.byKey(const ValueKey('history-bars')),
         matching: find.byType(GestureDetector),
       );
+      await tester.ensureVisible(bars.last);
+      await tester.pumpAndSettle();
       await tester.tap(bars.last);
       await tester.pumpAndSettle();
 
@@ -313,8 +326,8 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      await tester.scrollUntilVisible(find.text('Sumber data'), 200);
-      expect(find.text('Sumber data'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('SUMBER DATA'), 200);
+      expect(find.text('SUMBER DATA'), findsOneWidget);
       expect(find.textContaining('Kamera 30'), findsOneWidget);
       // Seconds included: an operator checking a stalled feed needs them.
       expect(find.textContaining('16:42:07'), findsOneWidget);

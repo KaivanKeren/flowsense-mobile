@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/app_version.dart';
 import '../../core/max_width.dart';
+import '../../widgets/widgets.dart';
 
 /// Where the numbers come from, and how far to trust them.
 ///
@@ -39,36 +40,41 @@ class TentangScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
-      appBar: AppBar(title: const Text('Tentang')),
+      backgroundColor: colors.surfaceCanvas,
+      appBar: AppBar(title: const Text('Tentang'), titleSpacing: FlowSpace.lg),
       body: MaxWidth448(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(
+            FlowSpace.lg,
+            FlowSpace.sm,
+            FlowSpace.lg,
+            FlowSpace.xxl,
+          ),
           children: [
             for (final (heading, body) in _sections) ...[
-              const SizedBox(height: 16),
-              Text(
-                heading,
-                style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
-              ),
-              const SizedBox(height: 6),
-              Text(body, style: text.bodyMedium),
-              const SizedBox(height: 16),
-              Divider(color: surfaces.roadLine, height: 1),
+              const SizedBox(height: FlowSpace.lg),
+              SectionHeader(title: heading),
+              const SizedBox(height: FlowSpace.sm),
+              Text(body, style: FlowTypography.of(context).body),
+              const SizedBox(height: FlowSpace.lg),
+              Divider(color: colors.borderSubtle, height: 1),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: FlowSpace.xl),
             Text(
               'FlowSense versi $kAppVersion',
-              style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+              style: FlowTypography.of(context)
+                  .caption
+                  .copyWith(color: colors.textMuted),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: FlowSpace.xs),
             Text(
               'Universitas Muria Kudus',
-              style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+              style: FlowTypography.of(context)
+                  .caption
+                  .copyWith(color: colors.textMuted),
             ),
           ],
         ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,9 +13,9 @@ import '../../domain/history.dart';
 import '../../domain/lane_label.dart';
 import '../../domain/video_panel_state.dart';
 import '../../state/providers.dart';
+import '../../widgets/widgets.dart';
 import '../common/feed_view.dart';
-import '../common/stale_banner.dart';
-import '../common/status_pill.dart';
+import '../common/relative_time.dart';
 import 'kalibrasi_screen.dart';
 
 /// One intersection, in the depth an operator needs.
@@ -29,7 +31,7 @@ class DetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     final intersections = ref.watch(intersectionsProvider).valueOrNull;
     final state = ref.watch(snapshotProvider).valueOrNull;
     final config = ref.watch(appConfigProvider);
@@ -41,34 +43,54 @@ class DetailScreen extends ConsumerWidget {
         .firstWhere((i) => true, orElse: () => null);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
+      // Title only. The `Kalibrasi` button used to sit in `actions`, and an
+      // app bar gives its title whatever the actions leave — so at 320 px and
+      // textScale 1.3 `Simpang DPRD` was handed 165 of the 169 px it needed
+      // and rendered as `Simpang DPR…`. The button moves into the header
+      // below, where it has the full column width and a name of any length
+      // fits beside it.
       appBar: AppBar(
         title: Text(intersection?.name ?? 'Simpang'),
-        actions: [
-          if (intersection != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => KalibrasiScreen(cameraId: cameraId),
-                  ),
-                ),
-                child: const Text('Kalibrasi'),
-              ),
-            ),
-        ],
+        titleSpacing: FlowSpace.lg,
       ),
       body: MaxWidth448(
         child: Builder(
           key: const ValueKey('detail-body'),
           builder: (context) {
-            if (intersections == null || state == null || intersection == null) {
-              return const Center(child: CircularProgressIndicator());
+            void retry() => unawaited(ref.read(repositoryProvider).poll());
+
+            // Loading. A skeleton in the shape of the sections, so the page
+            // says what is coming and does not jump when it lands.
+            if (intersections == null || state == null) {
+              return const SkeletonList(rows: 6);
+            }
+
+            // The route was handed a camera id nothing in the directory
+            // matches. A dead link names itself and offers the way back; it is
+            // not a spinner that never resolves.
+            if (intersection == null) {
+              return MessageState.error(
+                title: 'Simpang tidak ditemukan',
+                message: 'Kamera $cameraId tidak ada dalam daftar simpang.',
+                actionLabel: 'Kembali',
+                onAction: () => Navigator.of(context).maybePop(),
+              );
             }
 
             final FeedView(:snapshot, :banner) = FeedView.of(state, now);
-            final record = snapshot?.forCamera(cameraId);
+
+            // Error: nothing cached, nothing reachable.
+            if (snapshot == null) {
+              return MessageState.error(
+                title: 'Tidak ada koneksi',
+                message: 'Belum ada data tersimpan untuk simpang ini.',
+                actionLabel: 'Coba lagi',
+                onAction: retry,
+              );
+            }
+
+            final record = snapshot.forCamera(cameraId);
             final stale =
                 record == null || isStale(record, now, config.staleAfter);
             final level = record == null
@@ -81,20 +103,24 @@ class DetailScreen extends ConsumerWidget {
 
             return Column(
               children: [
-                if (banner != null) StaleBanner(message: banner),
+                // Stale: the last good data keeps rendering underneath. A
+                // failed poll must never empty the screen; it only ever adds
+                // this strip.
+                if (banner != null) StaleNotice(message: banner, onRetry: retry),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.only(bottom: 32),
+                    padding: const EdgeInsets.only(bottom: FlowSpace.xxl),
                     children: [
                       _Header(
                         record: record,
                         level: level,
                         isStale: stale,
                         now: now,
+                        cameraId: cameraId,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: FlowSpace.md),
                       const _CameraPanel(),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: FlowSpace.xl),
                       _Section(
                         title: 'Per lajur',
                         child: _Lanes(
@@ -104,7 +130,7 @@ class DetailScreen extends ConsumerWidget {
                           laneCapacityDefault: config.laneCapacityDefault,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: FlowSpace.xl),
                       _Section(
                         title: 'Riwayat 24 jam',
                         child: _DayHistory(
@@ -114,7 +140,7 @@ class DetailScreen extends ConsumerWidget {
                           laneCapacityDefault: config.laneCapacityDefault,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: FlowSpace.xl),
                       _Section(
                         title: 'Sumber data',
                         child: _SourceNotes(
@@ -140,34 +166,51 @@ class _Header extends StatelessWidget {
     required this.level,
     required this.isStale,
     required this.now,
+    required this.cameraId,
   });
 
   final TrafficRecord? record;
   final CongestionLevel level;
   final bool isStale;
   final DateTime now;
+  final String cameraId;
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     final reading = record;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(
+        FlowSpace.lg,
+        FlowSpace.sm,
+        FlowSpace.lg,
+        0,
+      ),
+      // Wrap rather than Row: the chip, the reading and the button are three
+      // items of unpredictable width, and at textScale 1.3 on a 320 px screen
+      // they stop fitting on one line. Wrapping puts the button underneath;
+      // a Row would have overflowed or squeezed the reading to nothing.
+      child: Wrap(
+        spacing: FlowSpace.md,
+        runSpacing: FlowSpace.sm,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          StatusPill(level: level, isStale: isStale),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              reading == null
-                  ? 'Belum ada data untuk simpang ini'
-                  : '${reading.totalVehicles} kendaraan · '
-                      '${relativeIndonesian(now.difference(reading.ts))}',
-              style:
-                  text.bodyMedium?.copyWith(color: surfaces.textSecondary),
+          StatusChip.congestion(level: level, isStale: isStale),
+          Text(
+            reading == null
+                ? 'Belum ada data untuk simpang ini'
+                : '${reading.totalVehicles} kendaraan · '
+                    '${relativeIndonesian(now.difference(reading.ts))}',
+            style: type.metricUnit,
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => KalibrasiScreen(cameraId: cameraId),
+              ),
             ),
+            child: const Text('Kalibrasi'),
           ),
         ],
       ),
@@ -183,20 +226,13 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: FlowSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: surfaces.textSecondary),
-          ),
-          const SizedBox(height: 10),
+          SectionHeader(title: title, mono: true),
+          const SizedBox(height: FlowSpace.sm),
           child,
         ],
       ),
@@ -224,8 +260,8 @@ class _CameraPanelState extends State<_CameraPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -233,12 +269,12 @@ class _CameraPanelState extends State<_CameraPanel> {
         AspectRatio(
           aspectRatio: 16 / 9,
           child: ColoredBox(
-            color: surfaces.textPrimary,
+            color: colors.surfaceElevated,
             child: Stack(
               children: [
                 Positioned(
-                  top: 10,
-                  left: 10,
+                  top: FlowSpace.sm,
+                  left: FlowSpace.sm,
                   child: _StreamBadge(phase: _state.phase),
                 ),
                 Center(
@@ -249,18 +285,18 @@ class _CameraPanelState extends State<_CameraPanel> {
                         _state.phase == VideoPhase.gagal
                             ? Icons.videocam_off_outlined
                             : Icons.videocam_outlined,
-                        size: 32,
-                        color: surfaces.faintInk,
+                        size: FlowIconSize.xl,
+                        color: colors.textMuted,
                       ),
                       if (_state.phase == VideoPhase.gagal) ...[
-                        const SizedBox(height: 10),
+                        const SizedBox(height: FlowSpace.sm),
                         OutlinedButton(
                           onPressed: () => setState(
                             () => _state = _state.manualReload(),
                           ),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: surfaces.card,
-                            side: BorderSide(color: surfaces.faintInk),
+                            foregroundColor: colors.textPrimary,
+                            side: BorderSide(color: colors.borderStrong),
                           ),
                           child: const Text('Muat ulang'),
                         ),
@@ -272,12 +308,12 @@ class _CameraPanelState extends State<_CameraPanel> {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: FlowSpace.sm),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: FlowSpace.lg),
           child: Text(
             'Sumber: portal CCTV Pemkab Kudus, diteruskan lewat server',
-            style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+            style: type.caption.copyWith(color: colors.textMuted),
           ),
         ),
       ],
@@ -292,20 +328,21 @@ class _StreamBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: surfaces.page,
-        borderRadius: BorderRadius.circular(FlowRadius.control),
+        color: colors.surfaceCard,
+        borderRadius: BorderRadius.circular(FlowRadius.sm),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(
+          horizontal: FlowSpace.sm,
+          vertical: FlowSpace.xs,
+        ),
         child: Text(
           phase.label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: surfaces.textPrimary),
+          style: type.caption.copyWith(color: colors.textPrimary),
         ),
       ),
     );
@@ -329,6 +366,8 @@ class _Lanes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final reading = record;
 
     // Absence of data is never a clear road, here least of all — this is the
@@ -336,22 +375,33 @@ class _Lanes extends StatelessWidget {
     if (reading == null || reading.perLane.isEmpty) {
       return Text(
         'Tidak ada rincian lajur.',
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: type.body.copyWith(color: colors.textSecondary),
       );
     }
 
-    return Column(
-      children: [
-        for (final lane in intersection.orderedLanes(reading.perLane.keys))
-          _LaneRow(
-            key: ValueKey('lane-$lane'),
-            lane: lane,
-            count: reading.perLane[lane]!,
-            capacity:
-                intersection.capacityFor(lane, fallback: laneCapacityDefault),
-            isStale: isStale,
-          ),
-      ],
+    final lanes = intersection.orderedLanes(reading.perLane.keys);
+
+    // One card, rows divided edge to edge — the same shape as the dashboard's
+    // intersection list, so a page of numbers reads as one instrument.
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < lanes.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: colors.borderSubtle),
+            _LaneRow(
+              key: ValueKey('lane-${lanes[i]}'),
+              lane: lanes[i],
+              count: reading.perLane[lanes[i]]!,
+              capacity: intersection.capacityFor(
+                lanes[i],
+                fallback: laneCapacityDefault,
+              ),
+              isStale: isStale,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -372,9 +422,8 @@ class _LaneRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final level = levelForLane(count, capacity);
     final color = colors.forLevel(isStale ? CongestionLevel.unknown : level);
@@ -387,26 +436,26 @@ class _LaneRow extends StatelessWidget {
           '${statusLabel(level, isStale: isStale).toLowerCase()}',
       excludeSemantics: true,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.symmetric(
+          horizontal: FlowSpace.md,
+          vertical: FlowSpace.md,
+        ),
         child: Row(
           children: [
             SizedBox(
               width: 88,
-              child: Text(
-                laneLabel(lane),
-                style: text.bodyMedium,
-              ),
+              child: Text(laneLabel(lane), style: type.body),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: FlowSpace.sm),
             Expanded(
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(FlowRadius.sm),
                 child: SizedBox(
-                  height: 8,
+                  height: FlowSpace.sm,
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: ColoredBox(color: surfaces.roadLine),
+                        child: ColoredBox(color: colors.dataTrack),
                       ),
                       // Both `Positioned.fill` and `heightFactor: 1` are load
                       // bearing. Without the factor the child is handed loose
@@ -428,17 +477,16 @@ class _LaneRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: FlowSpace.sm),
             SizedBox(
               width: 38,
               child: Text(
                 '$count/$capacity',
                 textAlign: TextAlign.right,
-                style:
-                    text.bodySmall?.copyWith(color: surfaces.textSecondary),
+                style: type.caption.copyWith(color: colors.textSecondary),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: FlowSpace.sm),
             SizedBox(
               width: 34,
               child: Text(
@@ -447,7 +495,7 @@ class _LaneRow extends StatelessWidget {
                 // Neutral ink. The bar already carries the level, and the
                 // congestion reds are reserved — and would fail contrast at
                 // this size anyway.
-                style: text.bodySmall?.copyWith(color: surfaces.textPrimary),
+                style: type.caption.copyWith(color: colors.textPrimary),
               ),
             ),
           ],
@@ -487,9 +535,8 @@ class _DayHistoryState extends ConsumerState<_DayHistory> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final records =
         ref.watch(operatorHistoryProvider(widget.cameraId)).valueOrNull ??
@@ -512,70 +559,74 @@ class _DayHistoryState extends ConsumerState<_DayHistory> {
         ? null
         : buckets[_touched!.clamp(0, buckets.length - 1)];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          cursor == null
-              ? 'Ketuk batang untuk melihat periodenya'
-              : cursor.hasData
-                  ? 'Pukul ${hourMinute(cursor.minute)} · '
-                      '${cursor.count} kendaraan · '
-                      '${cursor.level.label.toLowerCase()}'
-                  : 'Pukul ${hourMinute(cursor.minute)} · data tidak masuk',
-          style: text.bodyMedium,
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          key: const ValueKey('history-bars'),
-          height: _DayHistory.chartHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (var i = 0; i < buckets.length; i++)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => setState(() => _touched = i),
-                    child: SizedBox(
-                      // Full-height target: at 96 bars across 360 px each one
-                      // is about 3 px wide, so the vertical run is all the
-                      // room a thumb gets.
-                      height: _DayHistory.chartHeight,
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Container(
-                          height: buckets[i].hasData && peak > 0
-                              ? (buckets[i].count! /
-                                      peak *
-                                      _DayHistory.chartHeight)
-                                  .clamp(2.0, _DayHistory.chartHeight)
-                              : _DayHistory.gapStubHeight,
-                          margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                          color: buckets[i].hasData
-                              ? colors.forLevel(buckets[i].level)
-                              : surfaces.faintInk,
+    return AppCard(
+      padding: const EdgeInsets.all(FlowSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            cursor == null
+                ? 'Ketuk batang untuk melihat periodenya'
+                : cursor.hasData
+                    ? 'Pukul ${hourMinute(cursor.minute)} · '
+                        '${cursor.count} kendaraan · '
+                        '${cursor.level.label.toLowerCase()}'
+                    : 'Pukul ${hourMinute(cursor.minute)} · data tidak masuk',
+            style: type.body,
+          ),
+          const SizedBox(height: FlowSpace.sm),
+          SizedBox(
+            key: const ValueKey('history-bars'),
+            height: _DayHistory.chartHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < buckets.length; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _touched = i),
+                      child: SizedBox(
+                        // Full-height target: at 96 bars across 360 px each one
+                        // is about 3 px wide, so the vertical run is all the
+                        // room a thumb gets.
+                        height: _DayHistory.chartHeight,
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Container(
+                            height: buckets[i].hasData && peak > 0
+                                ? (buckets[i].count! /
+                                        peak *
+                                        _DayHistory.chartHeight)
+                                    .clamp(2.0, _DayHistory.chartHeight)
+                                : _DayHistory.gapStubHeight,
+                            margin:
+                                const EdgeInsets.symmetric(horizontal: 0.5),
+                            color: buckets[i].hasData
+                                ? colors.forLevel(buckets[i].level)
+                                : colors.statusUnknown,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: FlowSpace.xs),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(hourMinute(buckets.first.minute), style: type.caption),
+              Text(
+                hourMinute(buckets[buckets.length ~/ 2].minute),
+                style: type.caption,
+              ),
+              Text('sekarang', style: type.caption),
             ],
           ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(hourMinute(buckets.first.minute), style: text.bodySmall),
-            Text(
-              hourMinute(buckets[buckets.length ~/ 2].minute),
-              style: text.bodySmall,
-            ),
-            Text('sekarang', style: text.bodySmall),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -589,8 +640,8 @@ class _SourceNotes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final reading = record;
 
     String seconds(DateTime t) =>
@@ -611,18 +662,21 @@ class _SourceNotes extends StatelessWidget {
       'Connector v$kAppVersion',
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final line in lines)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              line,
-              style: text.bodySmall?.copyWith(color: surfaces.textSecondary),
+    return AppCard(
+      padding: const EdgeInsets.all(FlowSpace.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: FlowSpace.xs),
+              child: Text(
+                line,
+                style: type.caption.copyWith(color: colors.textSecondary),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

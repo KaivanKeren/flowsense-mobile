@@ -22,37 +22,39 @@ class AkunScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
     final auth = ref.watch(authProvider);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
-      appBar: AppBar(title: const Text('Akun')),
+      backgroundColor: colors.surfaceCanvas,
+      appBar: AppBar(
+        title: const Text('Akun'),
+        titleSpacing: FlowSpace.lg,
+      ),
       body: MaxWidth448(
         child: ListView(
           key: const ValueKey('akun-body'),
           padding: EdgeInsets.zero,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.all(FlowSpace.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     auth is AuthSignedIn ? auth.operator.nama : '—',
-                    style: text.titleLarge,
+                    style: type.sectionTitle,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: FlowSpace.xs),
                   Text(
                     auth is AuthSignedIn ? auth.operator.email : '',
-                    style: text.bodyMedium
-                        ?.copyWith(color: surfaces.textSecondary),
+                    style: type.caption,
                   ),
                 ],
               ),
             ),
-            Divider(height: 1, color: surfaces.roadLine),
+            Divider(height: 1, color: colors.borderSubtle),
             // The way back, and deliberately not `Keluar`. Switching view
             // keeps the session: an operator who wants to check the map the
             // way a rider sees it should not have to re-enter a password to
@@ -75,17 +77,17 @@ class AkunScreen extends ConsumerWidget {
               )),
             ),
             const _Row(label: 'Versi aplikasi', trailing: kAppVersion),
-            const SizedBox(height: 24),
+            const SizedBox(height: FlowSpace.xl),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: FlowSpace.lg),
               child: OutlinedButton(
                 key: const ValueKey('sign-out'),
                 onPressed: auth is AuthSignedIn
                     ? () => unawaited(_confirmSignOut(context, ref))
                     : null,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: surfaces.errorInk,
-                  side: BorderSide(color: surfaces.errorInk),
+                  foregroundColor: colors.statusEmergency,
+                  side: BorderSide(color: colors.statusEmergency),
                 ),
                 child: const Text('Keluar'),
               ),
@@ -146,33 +148,39 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: surfaces.roadLine)),
+        border: Border(bottom: BorderSide(color: colors.borderSubtle)),
       ),
       child: InkWell(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          constraints: const BoxConstraints(minHeight: FlowTouch.minTarget),
+          padding: const EdgeInsets.symmetric(
+            horizontal: FlowSpace.lg,
+            vertical: FlowSpace.md,
+          ),
           child: Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 20, color: surfaces.textPrimary),
-                const SizedBox(width: 12),
+                Icon(icon, size: FlowIconSize.md, color: colors.textPrimary),
+                const SizedBox(width: FlowSpace.md),
               ],
-              Expanded(child: Text(label, style: text.titleMedium)),
+              Expanded(child: Text(label, style: type.sectionTitle)),
               if (trailing != null)
                 Text(
                   trailing!,
-                  style: text.bodyMedium
-                      ?.copyWith(color: surfaces.textSecondary),
+                  style: type.caption.copyWith(color: colors.textSecondary),
                 )
               else if (onTap != null)
-                Icon(Icons.chevron_right, size: 20, color: surfaces.faintInk),
+                Icon(
+                  Icons.chevron_right,
+                  size: FlowIconSize.md,
+                  color: colors.textMuted,
+                ),
             ],
           ),
         ),

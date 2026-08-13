@@ -3,8 +3,8 @@ import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/domain/congestion.dart';
 import 'package:flowsense_mobile/features/common/relative_time.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
 import 'package:flowsense_mobile/features/detail/intersection_sheet.dart';
+import 'package:flowsense_mobile/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -78,7 +78,7 @@ void main() {
       );
 
       expect(find.text('Simpang DPRD'), findsOneWidget);
-      expect(find.widgetWithText(StatusPill, 'Macet'), findsOneWidget);
+      expect(find.widgetWithText(StatusChip, 'Macet'), findsOneWidget);
       expect(find.text('10 kendaraan · baru saja'), findsOneWidget);
     });
 
@@ -115,8 +115,8 @@ void main() {
         isStale: true,
       );
 
-      expect(find.widgetWithText(StatusPill, 'Data basi'), findsOneWidget);
-      expect(find.widgetWithText(StatusPill, 'Macet'), findsNothing);
+      expect(find.widgetWithText(StatusChip, 'Data basi'), findsOneWidget);
+      expect(find.widgetWithText(StatusChip, 'Macet'), findsNothing);
       expect(find.text('Perangkat tidak mengirim data'), findsOneWidget);
     });
   });
@@ -188,7 +188,7 @@ void main() {
 
       expect(find.text('Belum ada data untuk simpang ini'), findsOneWidget);
       expect(find.text('Tidak ada rincian lajur.'), findsOneWidget);
-      expect(find.widgetWithText(StatusPill, 'Tidak ada data'), findsOneWidget);
+      expect(find.widgetWithText(StatusChip, 'Tidak ada data'), findsOneWidget);
     });
 
     testWidgets('an empty per_lane is not rendered as a clear road',
@@ -200,9 +200,9 @@ void main() {
         level: CongestionLevel.unknown,
       );
 
-      expect(find.widgetWithText(StatusPill, 'Tidak ada data'), findsOneWidget);
+      expect(find.widgetWithText(StatusChip, 'Tidak ada data'), findsOneWidget);
       expect(find.text('Tidak ada rincian lajur.'), findsOneWidget);
-      expect(find.widgetWithText(StatusPill, 'Lancar'), findsNothing);
+      expect(find.widgetWithText(StatusChip, 'Lancar'), findsNothing);
       expect(_laneOrder(tester), isEmpty);
     });
   });

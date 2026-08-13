@@ -8,8 +8,8 @@ import 'package:flowsense_mobile/data/calibration/calibration_api.dart';
 import 'package:flowsense_mobile/data/models/intersection.dart';
 import 'package:flowsense_mobile/data/models/traffic_record.dart';
 import 'package:flowsense_mobile/data/models/traffic_snapshot.dart';
-import 'package:flowsense_mobile/features/common/status_pill.dart';
 import 'package:flowsense_mobile/features/operator/kalibrasi_screen.dart';
+import 'package:flowsense_mobile/widgets/widgets.dart';
 import 'package:flowsense_mobile/state/auth_providers.dart';
 import 'package:flowsense_mobile/state/calibration_providers.dart';
 import 'package:flowsense_mobile/state/providers.dart';
@@ -102,7 +102,7 @@ Finder _field(String lane) => find.descendant(
 
 Finder _pill(String lane) => find.descendant(
       of: find.byKey(ValueKey('capacity-$lane')),
-      matching: find.byType(StatusPill),
+      matching: find.byType(StatusChip),
     );
 
 void main() {
@@ -112,7 +112,11 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      expect(find.text('Kalibrasi — Simpang DPRD'), findsOneWidget);
+      // The bar names the screen and the body names the intersection. One
+      // combined app-bar title was 5 px short of fitting at 320 px and
+      // textScale 1.3, and shipped as `Kalibrasi — Simpang DPR…`.
+      expect(find.text('Kalibrasi'), findsOneWidget);
+      expect(find.text('Simpang DPRD'), findsOneWidget);
       expect(
         find.text(
           'Kapasitas adalah jumlah kendaraan yang memenuhi lajur saat '

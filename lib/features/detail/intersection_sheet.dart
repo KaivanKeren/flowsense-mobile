@@ -7,8 +7,8 @@ import '../../domain/congestion.dart';
 import '../../domain/geo.dart';
 import '../../domain/history.dart';
 import '../../domain/lane_label.dart';
+import '../../widgets/widgets.dart';
 import '../common/relative_time.dart';
-import '../common/status_pill.dart';
 import 'history_chart.dart';
 
 /// Everything known about one intersection, revealed in three stages as the
@@ -88,7 +88,7 @@ class _IntersectionSheetState extends State<IntersectionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
     final reading = widget.record;
 
     final buckets = bucketHistory(
@@ -102,11 +102,16 @@ class _IntersectionSheetState extends State<IntersectionSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _DragHandle(color: surfaces.faintInk),
+        _DragHandle(color: colors.textMuted),
         Expanded(
           child: ListView(
             controller: widget.scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+            padding: const EdgeInsets.fromLTRB(
+              FlowSpace.xl,
+              FlowSpace.xs,
+              FlowSpace.xl,
+              FlowSpace.xxl,
+            ),
             children: [
               // --- Stage one: compact -------------------------------------
               _Header(
@@ -114,14 +119,14 @@ class _IntersectionSheetState extends State<IntersectionSheet> {
                 level: widget.level,
                 isStale: widget.isStale,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: FlowSpace.sm),
               _Summary(
                 record: reading,
                 now: widget.now,
                 isStale: widget.isStale,
               ),
               if (reading != null && reading.perLane.isNotEmpty) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: FlowSpace.xs),
                 _WorstLaneLine(
                   intersection: widget.intersection,
                   record: reading,
@@ -129,7 +134,7 @@ class _IntersectionSheetState extends State<IntersectionSheet> {
                 ),
               ],
               if (widget.isStale && widget.onRetry != null) ...[
-                const SizedBox(height: 14),
+                const SizedBox(height: FlowSpace.md),
                 OutlinedButton(
                   onPressed: widget.onRetry,
                   child: const Text('Coba lagi'),
@@ -137,16 +142,16 @@ class _IntersectionSheetState extends State<IntersectionSheet> {
               ],
 
               // --- Stage two: lanes and history ---------------------------
-              const SizedBox(height: 18),
-              Divider(color: surfaces.roadLine, height: 1),
-              const SizedBox(height: 16),
+              const SizedBox(height: FlowSpace.lg),
+              Divider(color: colors.borderSubtle, height: 1),
+              const SizedBox(height: FlowSpace.lg),
               _Lanes(
                 intersection: widget.intersection,
                 record: reading,
                 isStale: widget.isStale,
                 laneCapacityDefault: widget.laneCapacityDefault,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: FlowSpace.xl),
               HistoryChart(
                 buckets: buckets,
                 lanes: widget.intersection.lanes,
@@ -155,10 +160,10 @@ class _IntersectionSheetState extends State<IntersectionSheet> {
               ),
 
               // --- Stage three: camera, then neighbours -------------------
-              const SizedBox(height: 22),
+              const SizedBox(height: FlowSpace.xl),
               const _CameraPanel(),
               if (widget.nearby.isNotEmpty) ...[
-                const SizedBox(height: 22),
+                const SizedBox(height: FlowSpace.xl),
                 _Nearby(
                   origin: widget.intersection,
                   items: widget.nearby,
@@ -180,11 +185,14 @@ class _DragHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 6),
+        padding: const EdgeInsets.only(
+          top: FlowSpace.sm,
+          bottom: FlowSpace.xs,
+        ),
         child: Center(
           child: Container(
-            width: 32,
-            height: 4,
+            width: FlowSpace.xxl,
+            height: FlowSpace.xs,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(2),
@@ -206,16 +214,19 @@ class _Header extends StatelessWidget {
   final bool isStale;
 
   @override
-  Widget build(BuildContext context) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(name, style: Theme.of(context).textTheme.titleLarge),
-          ),
-          const SizedBox(width: 12),
-          StatusPill(level: level, isStale: isStale),
-        ],
-      );
+  Widget build(BuildContext context) {
+    final type = FlowTypography.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(name, style: type.sectionTitle),
+        ),
+        const SizedBox(width: FlowSpace.md),
+        StatusChip.congestion(level: level, isStale: isStale),
+      ],
+    );
+  }
 }
 
 class _Summary extends StatelessWidget {
@@ -231,11 +242,11 @@ class _Summary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final type = FlowTypography.of(context);
     final reading = record;
 
     if (reading == null) {
-      return Text('Belum ada data untuk simpang ini', style: text.bodyMedium);
+      return Text('Belum ada data untuk simpang ini', style: type.body);
     }
 
     final age = relativeIndonesian(now.difference(reading.ts));
@@ -244,10 +255,9 @@ class _Summary extends StatelessWidget {
       children: [
         Text(
           '${reading.totalVehicles} kendaraan · $age',
-          style: text.bodyMedium,
+          style: type.body,
         ),
-        if (isStale)
-          Text('Perangkat tidak mengirim data', style: text.bodySmall),
+        if (isStale) Text('Perangkat tidak mengirim data', style: type.caption),
       ],
     );
   }
@@ -285,7 +295,7 @@ class _WorstLaneLine extends StatelessWidget {
     if (worstLane == null) return const SizedBox.shrink();
     return Text(
       '${laneLabel(worstLane)} paling padat',
-      style: Theme.of(context).textTheme.bodyMedium,
+      style: FlowTypography.of(context).body,
     );
   }
 }
@@ -312,7 +322,7 @@ class _Lanes extends StatelessWidget {
     if (reading == null || reading.perLane.isEmpty) {
       return Text(
         'Tidak ada rincian lajur.',
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: FlowTypography.of(context).body,
       );
     }
 
@@ -351,13 +361,13 @@ class _LaneRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = CongestionColors.of(context);
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final congestion = CongestionColors.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final level = levelForLane(count, capacity);
     final color =
-        colors.forLevel(isStale ? CongestionLevel.unknown : level);
+        congestion.forLevel(isStale ? CongestionLevel.unknown : level);
     final ratio = capacity <= 0 ? 0.0 : (count / capacity).clamp(0.0, 1.0);
 
     return Semantics(
@@ -365,28 +375,26 @@ class _LaneRow extends StatelessWidget {
           '${statusLabel(level, isStale: isStale).toLowerCase()}',
       excludeSemantics: true,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: FlowSpace.md),
         child: Row(
           children: [
             SizedBox(
               width: 92,
               child: Text(
                 laneLabel(lane),
-                style: text.bodyMedium?.copyWith(
-                  color: surfaces.textSecondary,
-                ),
+                style: type.body.copyWith(color: colors.textSecondary),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: FlowSpace.sm),
             Expanded(
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(FlowRadius.sm),
                 child: SizedBox(
-                  height: 8,
+                  height: FlowSpace.sm,
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: ColoredBox(color: surfaces.roadLine),
+                        child: ColoredBox(color: colors.borderSubtle),
                       ),
                       // `heightFactor: 1` is load bearing: without it the
                       // child gets loose vertical constraints and the
@@ -407,13 +415,13 @@ class _LaneRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: FlowSpace.md),
             SizedBox(
               width: 24,
               child: Text(
                 '$count',
                 textAlign: TextAlign.right,
-                style: text.bodyMedium,
+                style: type.body,
               ),
             ),
           ],
@@ -434,8 +442,8 @@ class _CameraPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -444,28 +452,31 @@ class _CameraPanel extends StatelessWidget {
           aspectRatio: 16 / 9,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: surfaces.map,
-              borderRadius: BorderRadius.circular(FlowRadius.card),
-              border: Border.all(color: surfaces.roadLine),
+              color: colors.surfaceElevated,
+              borderRadius: BorderRadius.circular(FlowRadius.md),
+              border: Border.all(color: colors.borderSubtle),
             ),
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.videocam_off_outlined,
-                      size: 24, color: surfaces.faintInk),
-                  const SizedBox(height: 8),
-                  Text('Kamera tidak tersedia', style: text.bodySmall),
+                  Icon(
+                    Icons.videocam_off_outlined,
+                    size: FlowIconSize.lg,
+                    color: colors.textMuted,
+                  ),
+                  const SizedBox(height: FlowSpace.sm),
+                  Text('Kamera tidak tersedia', style: type.caption),
                 ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: FlowSpace.sm),
         Text(
           'Diperbarui tiap 20 detik',
           textAlign: TextAlign.center,
-          style: text.bodySmall?.copyWith(color: surfaces.textFaint),
+          style: type.caption.copyWith(color: colors.textMuted),
         ),
       ],
     );
@@ -487,8 +498,8 @@ class _Nearby extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     final sorted = [...items]..sort((a, b) => distanceKm(
               origin.lat,
@@ -505,15 +516,15 @@ class _Nearby extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Simpang terdekat', style: text.titleMedium),
-        const SizedBox(height: 10),
+        Text('Simpang terdekat', style: type.sectionTitle),
+        const SizedBox(height: FlowSpace.sm),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
               for (final item in sorted.take(6))
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: FlowSpace.sm),
                   child: Semantics(
                     button: onSelect != null,
                     label: '${item.intersection.name}, '
@@ -524,26 +535,28 @@ class _Nearby extends StatelessWidget {
                           ? null
                           : () => onSelect!(item.intersection),
                       child: Container(
-                        constraints: const BoxConstraints(minHeight: 44),
+                        constraints:
+                            const BoxConstraints(minHeight: FlowTouch.minTarget),
                         alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                          horizontal: FlowSpace.md,
+                          vertical: FlowSpace.sm,
+                        ),
                         decoration: BoxDecoration(
-                          color: surfaces.card,
-                          borderRadius:
-                              BorderRadius.circular(FlowRadius.control),
-                          border: Border.all(color: surfaces.roadLine),
+                          color: colors.surfaceCard,
+                          borderRadius: BorderRadius.circular(FlowRadius.sm),
+                          border: Border.all(color: colors.borderSubtle),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            StatusDot(
+                            StatusDot.congestion(
                               level: item.level,
                               isStale: item.isStale,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: FlowSpace.sm),
                             Text(item.intersection.name,
-                                style: text.bodyMedium),
+                                style: type.body),
                           ],
                         ),
                       ),

@@ -18,7 +18,8 @@ import '../../state/auth_providers.dart';
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
-  static const double margin = 24;
+  /// The screen gutter: 24 on each side, the largest spacing step.
+  static const double margin = FlowSpace.xl;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -79,8 +80,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     // An expired session explains itself here rather than dumping the operator
     // on a blank form wondering what happened.
@@ -88,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final message = _error ?? (auth is AuthSignedOut ? auth.message : null);
 
     return Scaffold(
-      backgroundColor: surfaces.page,
+      backgroundColor: colors.surfaceCanvas,
       body: MaxWidth448(
         child: SafeArea(
           // Centred vertically, as the reference sits — and scrollable, so the
@@ -97,25 +98,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             builder: (context, constraints) => SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                 horizontal: LoginScreen.margin,
-                vertical: 24,
+                vertical: FlowSpace.xl,
               ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - 48,
+                  minHeight: constraints.maxHeight - 2 * LoginScreen.margin,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('FlowSense', style: text.displaySmall),
-                    const SizedBox(height: 2),
+                    Text('FlowSense', style: type.metricLarge),
+                    const SizedBox(height: FlowSpace.xs),
                     Text(
                       'Konsol operator',
-                      style: text.bodyMedium?.copyWith(
-                        color: surfaces.textSecondary,
-                      ),
+                      style: type.body.copyWith(color: colors.textSecondary),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: FlowSpace.xxl),
                     _Field(
                       key: const ValueKey('field-email'),
                       label: 'Email',
@@ -125,7 +124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       autofillHints: const [AutofillHints.username],
                       onSubmitted: (_) => _submit(),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: FlowSpace.lg),
                     _Field(
                       key: const ValueKey('field-password'),
                       label: 'Kata sandi',
@@ -141,8 +140,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           _obscure
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
-                          size: 20,
-                          color: surfaces.textSecondary,
+                          size: FlowIconSize.md,
+                          color: colors.textSecondary,
                         ),
                         tooltip: _obscure
                             ? 'Perlihatkan kata sandi'
@@ -150,48 +149,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     if (message != null) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: FlowSpace.lg),
                       _ErrorLine(message: message),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: FlowSpace.xl),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: _busy ? null : _submit,
                         child: _busy
                             ? SizedBox(
-                                width: 18,
-                                height: 18,
+                                width: FlowIconSize.sm,
+                                height: FlowIconSize.sm,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: surfaces.card,
+                                  color: colors.surfaceCard,
                                 ),
                               )
                             : const Text('Masuk'),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: FlowSpace.xl),
                     Text(
                       'Akun diterbitkan oleh dinas. '
                       'Hubungi administrator bila lupa sandi.',
                       textAlign: TextAlign.center,
-                      style: text.bodySmall?.copyWith(
-                        color: surfaces.textFaint,
-                      ),
+                      style: type.caption.copyWith(color: colors.textMuted),
                     ),
                     // The way out. Since the console is a mode rather than a
                     // separate install, someone can arrive here by pressing a
                     // button in Langganan without holding an account — and
                     // must not be left on a form they cannot fill in, with no
                     // route back to the map.
-                    const SizedBox(height: 8),
+                    const SizedBox(height: FlowSpace.sm),
                     Center(
                       child: TextButton(
                         key: const ValueKey('back-to-warga'),
                         // Ink rather than the scheme's seeded blue, like every
                         // other control on this screen.
                         style: TextButton.styleFrom(
-                          foregroundColor: surfaces.textPrimary,
+                          foregroundColor: colors.textPrimary,
                         ),
                         onPressed: () => ref
                             .read(appModeProvider.notifier)
@@ -235,19 +232,19 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
-    final text = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: text.titleMedium),
-        const SizedBox(height: 8),
+        Text(label, style: type.sectionTitle),
+        const SizedBox(height: FlowSpace.sm),
         DecoratedBox(
           decoration: BoxDecoration(
-            color: surfaces.card,
-            borderRadius: BorderRadius.circular(FlowRadius.control),
-            border: Border.all(color: surfaces.roadLine),
+            color: colors.surfaceCard,
+            borderRadius: BorderRadius.circular(FlowRadius.sm),
+            border: Border.all(color: colors.borderSubtle),
           ),
           child: Row(
             children: [
@@ -258,19 +255,17 @@ class _Field extends StatelessWidget {
                   keyboardType: keyboardType,
                   autofillHints: autofillHints,
                   onSubmitted: onSubmitted,
-                  style: text.bodyMedium,
+                  style: type.body,
                   decoration: InputDecoration(
                     hintText: hint,
-                    hintStyle: text.bodyMedium?.copyWith(
-                      color: surfaces.textSecondary,
-                    ),
+                    hintStyle: type.body.copyWith(color: colors.textSecondary),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 16,
+                      horizontal: FlowSpace.md,
+                      vertical: FlowSpace.lg,
                     ),
                   ),
                 ),
@@ -295,21 +290,21 @@ class _ErrorLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaces = FlowSurfaces.of(context);
+    final colors = AppColors.of(context);
+    final type = FlowTypography.of(context);
+    final ink = colors.statusEmergency;
 
     return Semantics(
       liveRegion: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, size: 16, color: surfaces.errorInk),
-          const SizedBox(width: 8),
+          Icon(Icons.error_outline, size: FlowIconSize.sm, color: ink),
+          const SizedBox(width: FlowSpace.sm),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: surfaces.errorInk),
+              style: type.body.copyWith(color: ink),
             ),
           ),
         ],
